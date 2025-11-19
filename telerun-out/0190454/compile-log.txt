@@ -1,0 +1,6 @@
+/tmp/tmphgpue8gx/source.cu(81): warning #177-D: variable "q_idx" was declared but never referenced
+      int q_idx = global_idx % seq_len_q;
+          ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+

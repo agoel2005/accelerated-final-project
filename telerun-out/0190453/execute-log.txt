@@ -1,0 +1,104 @@
+=================================================
+CUDA Attention Kernel Test Suite
+=================================================
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 4
+  Head dimension: 8
+========================================
+
+Running GPU kernel...
+Running CPU reference...
+
+Checking results...
+  Max difference: 0.000000 (within tolerance 0.001000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 8
+  Head dimension: 16
+========================================
+
+Running GPU kernel...
+Running CPU reference...
+
+Checking results...
+  Max difference: 0.000000 (within tolerance 0.001000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 2
+  Num heads: 4
+  Sequence length: 32
+  Head dimension: 32
+========================================
+
+Running GPU kernel...
+Running CPU reference...
+
+Checking results...
+  Max difference: 0.000000 (within tolerance 0.001000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 2
+  Num heads: 8
+  Sequence length: 64
+  Head dimension: 64
+========================================
+
+Running GPU kernel...
+Running CPU reference...
+
+Checking results...
+  Max difference: 0.000000 (within tolerance 0.001000)
+
+✓ TEST PASSED
+
+========================================
+Testing cross-attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Query sequence length: 16
+  Key/Value sequence length: 32
+  Head dimension: 32
+========================================
+
+Running GPU kernel...
+Running CPU reference...
+
+Checking results...
+  Max difference: 0.000000 (within tolerance 0.001000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 16
+  Head dimension: 64
+========================================
+
+Running GPU kernel...
+Running CPU reference...
+
+Checking results...
+  Max difference: 0.000000 (within tolerance 0.001000)
+
+✓ TEST PASSED
+
+=================================================
+All tests completed!
+=================================================
