@@ -1,0 +1,10 @@
+/tmp/tmps3tbwh8c/source.cu(231): warning #177-D: variable "warp_id" was declared but never referenced
+      const int warp_id = tid / 32;
+                ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/tmp/tmps3tbwh8c/source.cu(232): warning #177-D: variable "lane_id" was declared but never referenced
+      const int lane_id = tid % 32;
+                ^
+

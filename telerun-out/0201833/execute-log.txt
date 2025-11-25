@@ -1,0 +1,16 @@
+=================================================
+Ultra-Optimized Attention Kernel
+With Tensor Cores, cp.async, and Double Buffering
+=================================================
+
+*** Testing hdim=512 ***
+
+========================================
+Testing ULTRA-OPTIMIZED attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 512
+========================================
+
+CUDA error 1 (invalid argument) at /tmp/tmpgrz2_4t0/source.cu:346

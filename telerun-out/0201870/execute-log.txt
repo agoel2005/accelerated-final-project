@@ -1,0 +1,16 @@
+=================================================
+Tensor Core Accelerated Attention Kernel
+Target: hdim = 2048, 4096, 8192
+=================================================
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing TENSOR CORE attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 2048
+========================================
+
+CUDA error 1 (invalid argument) at /tmp/tmpu3kjflzy/source.cu:318

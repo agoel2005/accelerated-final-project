@@ -1,0 +1,14 @@
+/tmp/tmpgrz2_4t0/source.cu(132): warning #177-D: variable "warp_id" was declared but never referenced
+      const int warp_id = tid / 32;
+                ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/tmp/tmpgrz2_4t0/source.cu(133): warning #177-D: variable "lane_id" was declared but never referenced
+      const int lane_id = tid % 32;
+                ^
+
+/tmp/tmpgrz2_4t0/source.cu(178): warning #177-D: variable "NUM_BUFFERS" was declared but never referenced
+      constexpr int NUM_BUFFERS = 2;
+                    ^
+

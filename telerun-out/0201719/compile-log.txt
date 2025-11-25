@@ -1,0 +1,5 @@
+/tmp/tmpz4jqa0y1/source.cu(498): error: identifier "attention_forward" is undefined
+          attention_forward(Q, K, V, out, batch_sz, num_heads, len_q, len_k, head_d);
+          ^
+
+1 error detected in the compilation of "/tmp/tmpz4jqa0y1/source.cu".

@@ -1,0 +1,96 @@
+=================================================
+Optimized Attention Kernel for Large Dimensions
+Target: hdim = 2048, 4096, 8192
+=================================================
+
+*** Testing hdim=512 ***
+
+========================================
+Testing LARGE DIM attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 512
+========================================
+
+Running optimized kernel for large dimensions...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.049 ms
+Performance: 0.68 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing LARGE DIM attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 2048
+========================================
+
+Running optimized kernel for large dimensions...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.164 ms
+Performance: 0.82 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+*** Testing hdim=4096 ***
+
+========================================
+Testing LARGE DIM attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 32
+  Head dimension: 4096
+========================================
+
+Running optimized kernel for large dimensions...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.125 ms
+Performance: 0.27 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+*** Testing hdim=8192 ***
+
+========================================
+Testing LARGE DIM attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 16
+  Head dimension: 8192
+========================================
+
+Running optimized kernel for large dimensions...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.185 ms
+Performance: 0.05 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+=================================================
+All tests completed!
+=================================================

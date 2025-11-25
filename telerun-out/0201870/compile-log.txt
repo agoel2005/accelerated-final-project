@@ -1,0 +1,10 @@
+/tmp/tmpu3kjflzy/source.cu(194): warning #177-D: variable "k_col" was declared but never referenced
+                  int k_col = lane_id / 4;
+                      ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/tmp/tmpu3kjflzy/source.cu(114): warning #177-D: variable "MMA_N" was declared but never referenced
+      constexpr int MMA_N = 8;
+                    ^
+

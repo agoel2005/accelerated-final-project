@@ -1,0 +1,118 @@
+=================================================
+Optimized Attention Kernel for Large Dimensions
+Target: hdim = 2048, 4096, 8192
+=================================================
+
+*** Testing hdim=512 ***
+
+========================================
+Testing LARGE DIM attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 512
+========================================
+
+Running optimized kernel for large dimensions...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.056 ms
+Performance: 0.60 TFLOPS
+
+Checking results vs CPU...
+  Mismatch at index 35: GPU=0.253962, CPU=0.144976, diff=0.108987
+  Mismatch at index 38: GPU=0.217015, CPU=0.125697, diff=0.091318
+  Mismatch at index 39: GPU=0.139005, CPU=0.067482, diff=0.071523
+  Mismatch at index 41: GPU=0.160121, CPU=0.093741, diff=0.066380
+  Mismatch at index 42: GPU=-0.176069, CPU=-0.078049, diff=0.098020
+  Mismatch at index 43: GPU=-0.170708, CPU=-0.094850, diff=0.075857
+  Mismatch at index 46: GPU=-0.119966, CPU=-0.054443, diff=0.065522
+  Mismatch at index 50: GPU=-0.367742, CPU=-0.188037, diff=0.179705
+  Mismatch at index 53: GPU=0.175906, CPU=0.100452, diff=0.075454
+  Mismatch at index 57: GPU=0.158510, CPU=0.089266, diff=0.069245
+  Total mismatches: 7796 / 131072
+  Max difference: 0.306923
+
+✗ TEST FAILED
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing LARGE DIM attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 2048
+========================================
+
+Running optimized kernel for large dimensions...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.181 ms
+Performance: 0.74 TFLOPS
+
+Checking results vs CPU...
+  Mismatch at index 36: GPU=0.356780, CPU=0.179923, diff=0.176857
+  Mismatch at index 39: GPU=0.101453, CPU=0.051162, diff=0.050291
+  Mismatch at index 41: GPU=-0.117715, CPU=-0.059363, diff=0.058352
+  Mismatch at index 43: GPU=-0.107663, CPU=-0.054294, diff=0.053369
+  Mismatch at index 45: GPU=0.174767, CPU=0.088134, diff=0.086632
+  Mismatch at index 46: GPU=0.320939, CPU=0.161848, diff=0.159091
+  Mismatch at index 48: GPU=0.103897, CPU=0.052395, diff=0.051502
+  Mismatch at index 53: GPU=0.231916, CPU=0.116955, diff=0.114962
+  Mismatch at index 54: GPU=-0.130731, CPU=-0.065927, diff=0.064804
+  Mismatch at index 55: GPU=-0.190043, CPU=-0.095838, diff=0.094205
+  Total mismatches: 30872 / 524288
+  Max difference: 0.288011
+
+✗ TEST FAILED
+
+*** Testing hdim=4096 ***
+
+========================================
+Testing LARGE DIM attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 32
+  Head dimension: 4096
+========================================
+
+Running optimized kernel for large dimensions...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.111 ms
+Performance: 0.30 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+*** Testing hdim=8192 ***
+
+========================================
+Testing LARGE DIM attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 16
+  Head dimension: 8192
+========================================
+
+Running optimized kernel for large dimensions...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.161 ms
+Performance: 0.05 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+=================================================
+All tests completed!
+=================================================
