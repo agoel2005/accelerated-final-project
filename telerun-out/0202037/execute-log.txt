@@ -1,0 +1,180 @@
+=================================================
+Tensor Core Attention Kernel - Version 2
+Target: hdim = 2048, 4096, 8192
+=================================================
+
+*** Testing hdim=512 ***
+
+========================================
+Testing TENSOR CORE attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 512
+========================================
+
+Launching tensor core kernel with shmem=24704 bytes
+Running tensor core kernel...
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Running CPU reference...
+
+--- Performance Results ---
+Tensor core kernel time: 0.198 ms
+Performance: 0.17 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000034 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing TENSOR CORE attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 2048
+========================================
+
+Launching tensor core kernel with shmem=24704 bytes
+Running tensor core kernel...
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Launching tensor core kernel with shmem=24704 bytes
+Running CPU reference...
+
+--- Performance Results ---
+Tensor core kernel time: 0.728 ms
+Performance: 0.18 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000037 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+*** Testing hdim=4096 ***
+
+========================================
+Testing TENSOR CORE attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 32
+  Head dimension: 4096
+========================================
+
+Launching tensor core kernel with shmem=22656 bytes
+Running tensor core kernel...
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Launching tensor core kernel with shmem=22656 bytes
+Running CPU reference...
+
+--- Performance Results ---
+Tensor core kernel time: 1.158 ms
+Performance: 0.03 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000042 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+*** Testing hdim=8192 ***
+
+========================================
+Testing TENSOR CORE attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 16
+  Head dimension: 8192
+========================================
+
+Launching tensor core kernel with shmem=21632 bytes
+Running tensor core kernel...
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Launching tensor core kernel with shmem=21632 bytes
+Running CPU reference...
+
+--- Performance Results ---
+Tensor core kernel time: 1.549 ms
+Performance: 0.01 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000055 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+=================================================
+All tests completed!
+=================================================

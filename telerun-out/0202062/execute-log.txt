@@ -1,0 +1,163 @@
+=================================================
+Pure FP16 Attention Kernel Test Suite
+NO CONVERSION OVERHEAD!
+=================================================
+
+--- BASIC CORRECTNESS TESTS ---
+
+========================================
+Testing FP16 attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 4
+  Head dimension: 8
+========================================
+
+Running FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+FP16 kernel time: 0.007 ms
+Performance: 0.00 TFLOPS
+
+Checking FP16 results vs CPU (FP32)...
+  Max difference: 0.000318 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+========================================
+Testing FP16 attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 8
+  Head dimension: 16
+========================================
+
+Running FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+FP16 kernel time: 0.007 ms
+Performance: 0.00 TFLOPS
+
+Checking FP16 results vs CPU (FP32)...
+  Max difference: 0.000356 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+========================================
+Testing FP16 attention kernel:
+  Batch size: 2
+  Num heads: 4
+  Sequence length: 32
+  Head dimension: 32
+========================================
+
+Running FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+FP16 kernel time: 0.009 ms
+Performance: 0.11 TFLOPS
+
+Checking FP16 results vs CPU (FP32)...
+  Max difference: 0.000448 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+--- LARGE HEAD DIMENSION TESTS ---
+
+*** Testing hdim=512 ***
+
+========================================
+Testing FP16 attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 512
+========================================
+
+Running FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+FP16 kernel time: 0.067 ms
+Performance: 0.50 TFLOPS
+
+Checking FP16 results vs CPU (FP32)...
+  Max difference: 0.000308 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing FP16 attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 2048
+========================================
+
+Running FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+FP16 kernel time: 0.244 ms
+Performance: 0.55 TFLOPS
+
+Checking FP16 results vs CPU (FP32)...
+  Max difference: 0.000399 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+*** Testing hdim=4096 ***
+
+========================================
+Testing FP16 attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 32
+  Head dimension: 4096
+========================================
+
+Running FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+FP16 kernel time: 0.131 ms
+Performance: 0.26 TFLOPS
+
+Checking FP16 results vs CPU (FP32)...
+  Max difference: 0.000372 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+*** Testing hdim=8192 ***
+
+========================================
+Testing FP16 attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 16
+  Head dimension: 8192
+========================================
+
+Running FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+FP16 kernel time: 0.174 ms
+Performance: 0.05 TFLOPS
+
+Checking FP16 results vs CPU (FP32)...
+  Max difference: 0.000605 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+=================================================
+All FP16 tests completed!
+Compare these results with FP32 kernel:
+  - FP32 (hdim=2048): 0.214 ms
+  - FP16 should be faster (no conversions!)
+=================================================

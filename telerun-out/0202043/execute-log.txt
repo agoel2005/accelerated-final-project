@@ -1,0 +1,20 @@
+=================================================
+Multi-Query Attention Kernel Optimization
+Target: Process multiple queries per block
+=================================================
+
+*** Testing hdim=512 ***
+
+========================================
+Testing Multi-Query Attention:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 512
+========================================
+
+Multi-query kernel config:
+  BLOCK_Q=4, BLOCK_K=32
+  Grid: 64 blocks (16 q_blocks × 4 heads)
+  Shared memory: 131712 bytes (128.6 KB)
+CUDA error 1 (invalid argument) at /tmp/tmphckw3mg8/source.cu:254

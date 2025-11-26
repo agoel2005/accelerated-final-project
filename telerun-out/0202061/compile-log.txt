@@ -1,0 +1,13 @@
+/tmp/tmpmf6m61ys/source.cu(242): error: namespace "std" has no member "vector"
+                  std::vector<float> attn_scores(len_k);
+                       ^
+
+/tmp/tmpmf6m61ys/source.cu(242): error: type name is not allowed
+                  std::vector<float> attn_scores(len_k);
+                              ^
+
+/tmp/tmpmf6m61ys/source.cu(242): error: identifier "attn_scores" is undefined
+                  std::vector<float> attn_scores(len_k);
+                                     ^
+
+3 errors detected in the compilation of "/tmp/tmpmf6m61ys/source.cu".

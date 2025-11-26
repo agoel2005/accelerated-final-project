@@ -1,0 +1,22 @@
+/tmp/tmpu37dxjuw/source.cu(178): warning #177-D: variable "a_frag" was declared but never referenced
+              wmma::fragment<wmma::matrix_a, 16, 16, 16, half, wmma::row_major> a_frag;
+                                                                                ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/tmp/tmpu37dxjuw/source.cu(179): warning #177-D: variable "b_frag" was declared but never referenced
+              wmma::fragment<wmma::matrix_b, 16, 16, 16, half, wmma::col_major> b_frag;
+                                                                                ^
+
+/tmp/tmpu37dxjuw/source.cu(180): warning #177-D: variable "c_frag" was declared but never referenced
+              wmma::fragment<wmma::accumulator, 16, 16, 16, float> c_frag;
+                                                                   ^
+
+/tmp/tmpu37dxjuw/source.cu(183): warning #177-D: variable "warp_id" was declared but never referenced
+              const int warp_id = tid / 32;
+                        ^
+
+/tmp/tmpu37dxjuw/source.cu(184): warning #177-D: variable "num_warps" was declared but never referenced
+              const int num_warps = blockDim.x / 32;
+                        ^
+
