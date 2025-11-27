@@ -1,0 +1,15 @@
+python3: can't open file '/tmp/tmp4rl6k26k/benchmark_pytorch_telerun.py': [Errno 2] No such file or directory
+================================================================================
+PyTorch Benchmark Wrapper
+================================================================================
+
+Executing PyTorch benchmark script...
+
+
+ERROR: Python script failed with exit code 512
+Trying 'python' instead of 'python3'...
+
+python: can't open file '/tmp/tmp4rl6k26k/benchmark_pytorch_telerun.py': [Errno 2] No such file or directory
+
+ERROR: Could not run Python benchmark
+Make sure PyTorch is installed on the remote system
