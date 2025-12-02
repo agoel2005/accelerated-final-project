@@ -21,7 +21,7 @@ __device__ __forceinline__ float safe_div(float a, float b) {
     return b != 0.0f ? a / b : 0.0f;
 }
 
-// Warp-level reduction primitives
+// Warp shuffles
 __device__ __forceinline__ float warp_reduce_max(float val) {
     #pragma unroll
     for (int offset = 16; offset > 0; offset >>= 1) {
@@ -76,6 +76,176 @@ __device__ __forceinline__ float block_reduce_sum(float val, float* shared) {
     return shared[0];
 }
 
+
+
+
+// Version 5: float4 + sincos simultaneous 
+template<int BLOCK_N>
+__global__ void attention_fwd_kernel_sinusoidal_fused_v5(
+    const float* __restrict__ Q,
+    const float* __restrict__ K,
+    const float* __restrict__ V,
+    float* __restrict__ out,
+    int bs, int nh, int seq_q, int seq_k, int hdim,
+    float scale_factor
+) {
+    const int batch_head_idx = blockIdx.y;
+    const int b_idx = batch_head_idx / nh;
+    const int h_idx = batch_head_idx % nh;
+    const int q_idx = blockIdx.x;
+
+    if (q_idx >= seq_q) return;
+
+    const int tid = threadIdx.x;
+    const int qkv_base = (b_idx * nh + h_idx) * seq_q * hdim;
+    const int kv_base = (b_idx * nh + h_idx) * seq_k * hdim;
+
+    extern __shared__ float smem[];
+    float* s_scores = smem;
+    float* s_reduce = s_scores + BLOCK_N;
+    float* s_freqs = s_reduce + 32;
+
+    const int q_offset = qkv_base + q_idx * hdim;
+    const float base = 10000.0f;
+
+    // Cache frequencies
+    for (int d = tid; d < hdim; d += blockDim.x) {
+        s_freqs[d] = 1.0f / powf(base, (2.0f * (d / 2)) / (float)hdim);
+    }
+    __syncthreads();
+
+    float m_max = -INFINITY;
+    float l_sum = 0.0f;
+
+    for (int k_start = 0; k_start < seq_k; k_start += BLOCK_N) {
+        const int k_end = min(k_start + BLOCK_N, seq_k);
+        const int num_k = k_end - k_start;
+
+        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
+            int k_idx = k_start + k_local;
+            int k_offset = kv_base + k_idx * hdim;
+
+            float score = 0.0f;
+
+            if (hdim % 4 == 0) {
+                //use float 4
+                for (int d = 0; d < hdim; d += 4) {
+                    float4 q_vec = *reinterpret_cast<const float4*>(&Q[q_offset + d]);
+                    float4 k_vec = *reinterpret_cast<const float4*>(&K[k_offset + d]);
+                    float4 freq_vec = *reinterpret_cast<const float4*>(&s_freqs[d]);
+
+                    float sin_q0, cos_q0, sin_k0, cos_k0;
+                    float sin_q1, cos_q1, sin_k1, cos_k1;
+                    float sin_q2, cos_q2, sin_k2, cos_k2;
+                    float sin_q3, cos_q3, sin_k3, cos_k3;
+
+                    //compute simultaneously to speed up 
+                    __sincosf(q_idx * freq_vec.x, &sin_q0, &cos_q0);
+                    __sincosf(k_idx * freq_vec.x, &sin_k0, &cos_k0);
+                    __sincosf(q_idx * freq_vec.y, &sin_q1, &cos_q1);
+                    __sincosf(k_idx * freq_vec.y, &sin_k1, &cos_k1);
+                    __sincosf(q_idx * freq_vec.z, &sin_q2, &cos_q2);
+                    __sincosf(k_idx * freq_vec.z, &sin_k2, &cos_k2);
+                    __sincosf(q_idx * freq_vec.w, &sin_q3, &cos_q3);
+                    __sincosf(k_idx * freq_vec.w, &sin_k3, &cos_k3);
+
+                    float q_emb_0 = q_vec.x + sin_q0;
+                    float k_emb_0 = k_vec.x + sin_k0;
+                    float q_emb_1 = q_vec.y + cos_q1;
+                    float k_emb_1 = k_vec.y + cos_k1;
+                    float q_emb_2 = q_vec.z + sin_q2;
+                    float k_emb_2 = k_vec.z + sin_k2;
+                    float q_emb_3 = q_vec.w + cos_q3;
+                    float k_emb_3 = k_vec.w + cos_k3;
+
+                    score += q_emb_0 * k_emb_0 + q_emb_1 * k_emb_1 +
+                             q_emb_2 * k_emb_2 + q_emb_3 * k_emb_3;
+                }
+            } else {
+                for (int d = 0; d < hdim; d++) {
+                    float q_val = Q[q_offset + d];
+                    float k_val = K[k_offset + d];
+                    float freq = s_freqs[d];
+
+                    float sin_q, cos_q, sin_k, cos_k;
+                    __sincosf(q_idx * freq, &sin_q, &cos_q);
+                    __sincosf(k_idx * freq, &sin_k, &cos_k);
+
+                    if (d % 2 == 0) {
+                        q_val += sin_q;
+                        k_val += sin_k;
+                    } else {
+                        q_val += cos_q;
+                        k_val += cos_k;
+                    }
+
+                    score += q_val * k_val;
+                }
+            }
+
+            score *= scale_factor;
+            s_scores[k_local] = score;
+        }
+        __syncthreads();
+
+        //normal attention from here
+
+        float block_max = -INFINITY;
+        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
+            block_max = fmaxf(block_max, s_scores[k_local]);
+        }
+        block_max = block_reduce_max(block_max, s_reduce);
+
+        float m_new = fmaxf(m_max, block_max);
+        float correction = expf(m_max - m_new);
+
+        float block_sum = 0.0f;
+        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
+            float exp_val = expf(s_scores[k_local] - m_new);
+            s_scores[k_local] = exp_val;
+            block_sum += exp_val;
+        }
+        block_sum = block_reduce_sum(block_sum, s_reduce);
+
+        l_sum = correction * l_sum + block_sum;
+
+        for (int d = tid; d < hdim; d += blockDim.x) {
+            float prev_out = (k_start > 0) ? out[q_offset + d] : 0.0f;
+            float corrected_out = prev_out * correction;
+
+            float v_acc = 0.0f;
+            for (int k_local = 0; k_local < num_k; k_local++) {
+                int k_idx = k_start + k_local;
+                int v_offset = kv_base + k_idx * hdim + d;
+                v_acc += s_scores[k_local] * V[v_offset];
+            }
+
+            out[q_offset + d] = corrected_out + v_acc;
+        }
+
+        m_max = m_new;
+        __syncthreads();
+    }
+
+    for (int d = tid; d < hdim; d += blockDim.x) {
+        out[q_offset + d] /= l_sum;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // Version 1: Fused kernel with sinusoidal embeddings
 // Baseline approach: precomputed sin/cos tables
 template<int BLOCK_N>
@@ -83,8 +253,8 @@ __global__ void attention_fwd_kernel_sinusoidal_fused(
     const float* __restrict__ Q,
     const float* __restrict__ K,
     const float* __restrict__ V,
-    const float* __restrict__ sin_table,  // [max_seq_len, hdim]
-    const float* __restrict__ cos_table,  // [max_seq_len, hdim]
+    const float* __restrict__ sin_table,  
+    const float* __restrict__ cos_table,
     float* __restrict__ out,
     int bs, int nh, int seq_q, int seq_k, int hdim,
     float scale_factor
@@ -553,158 +723,6 @@ __global__ void attention_fwd_kernel_sinusoidal_fused_v4(
     }
 }
 
-// Version 5: float4 + sincos simultaneous 
-template<int BLOCK_N>
-__global__ void attention_fwd_kernel_sinusoidal_fused_v5(
-    const float* __restrict__ Q,
-    const float* __restrict__ K,
-    const float* __restrict__ V,
-    float* __restrict__ out,
-    int bs, int nh, int seq_q, int seq_k, int hdim,
-    float scale_factor
-) {
-    const int batch_head_idx = blockIdx.y;
-    const int b_idx = batch_head_idx / nh;
-    const int h_idx = batch_head_idx % nh;
-    const int q_idx = blockIdx.x;
-
-    if (q_idx >= seq_q) return;
-
-    const int tid = threadIdx.x;
-    const int qkv_base = (b_idx * nh + h_idx) * seq_q * hdim;
-    const int kv_base = (b_idx * nh + h_idx) * seq_k * hdim;
-
-    extern __shared__ float smem[];
-    float* s_scores = smem;
-    float* s_reduce = s_scores + BLOCK_N;
-    float* s_freqs = s_reduce + 32;
-
-    const int q_offset = qkv_base + q_idx * hdim;
-    const float base = 10000.0f;
-
-    // Cache frequencies
-    for (int d = tid; d < hdim; d += blockDim.x) {
-        s_freqs[d] = 1.0f / powf(base, (2.0f * (d / 2)) / (float)hdim);
-    }
-    __syncthreads();
-
-    float m_max = -INFINITY;
-    float l_sum = 0.0f;
-
-    for (int k_start = 0; k_start < seq_k; k_start += BLOCK_N) {
-        const int k_end = min(k_start + BLOCK_N, seq_k);
-        const int num_k = k_end - k_start;
-
-        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
-            int k_idx = k_start + k_local;
-            int k_offset = kv_base + k_idx * hdim;
-
-            float score = 0.0f;
-
-            if (hdim % 4 == 0) {
-                //use float 4
-                for (int d = 0; d < hdim; d += 4) {
-                    float4 q_vec = *reinterpret_cast<const float4*>(&Q[q_offset + d]);
-                    float4 k_vec = *reinterpret_cast<const float4*>(&K[k_offset + d]);
-                    float4 freq_vec = *reinterpret_cast<const float4*>(&s_freqs[d]);
-
-                    float sin_q0, cos_q0, sin_k0, cos_k0;
-                    float sin_q1, cos_q1, sin_k1, cos_k1;
-                    float sin_q2, cos_q2, sin_k2, cos_k2;
-                    float sin_q3, cos_q3, sin_k3, cos_k3;
-
-                    //compute simultaneously to speed up 
-                    __sincosf(q_idx * freq_vec.x, &sin_q0, &cos_q0);
-                    __sincosf(k_idx * freq_vec.x, &sin_k0, &cos_k0);
-                    __sincosf(q_idx * freq_vec.y, &sin_q1, &cos_q1);
-                    __sincosf(k_idx * freq_vec.y, &sin_k1, &cos_k1);
-                    __sincosf(q_idx * freq_vec.z, &sin_q2, &cos_q2);
-                    __sincosf(k_idx * freq_vec.z, &sin_k2, &cos_k2);
-                    __sincosf(q_idx * freq_vec.w, &sin_q3, &cos_q3);
-                    __sincosf(k_idx * freq_vec.w, &sin_k3, &cos_k3);
-
-                    float q_emb_0 = q_vec.x + sin_q0;
-                    float k_emb_0 = k_vec.x + sin_k0;
-                    float q_emb_1 = q_vec.y + cos_q1;
-                    float k_emb_1 = k_vec.y + cos_k1;
-                    float q_emb_2 = q_vec.z + sin_q2;
-                    float k_emb_2 = k_vec.z + sin_k2;
-                    float q_emb_3 = q_vec.w + cos_q3;
-                    float k_emb_3 = k_vec.w + cos_k3;
-
-                    score += q_emb_0 * k_emb_0 + q_emb_1 * k_emb_1 +
-                             q_emb_2 * k_emb_2 + q_emb_3 * k_emb_3;
-                }
-            } else {
-                for (int d = 0; d < hdim; d++) {
-                    float q_val = Q[q_offset + d];
-                    float k_val = K[k_offset + d];
-                    float freq = s_freqs[d];
-
-                    float sin_q, cos_q, sin_k, cos_k;
-                    __sincosf(q_idx * freq, &sin_q, &cos_q);
-                    __sincosf(k_idx * freq, &sin_k, &cos_k);
-
-                    if (d % 2 == 0) {
-                        q_val += sin_q;
-                        k_val += sin_k;
-                    } else {
-                        q_val += cos_q;
-                        k_val += cos_k;
-                    }
-
-                    score += q_val * k_val;
-                }
-            }
-
-            score *= scale_factor;
-            s_scores[k_local] = score;
-        }
-        __syncthreads();
-
-        //normal attention from here
-
-        float block_max = -INFINITY;
-        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
-            block_max = fmaxf(block_max, s_scores[k_local]);
-        }
-        block_max = block_reduce_max(block_max, s_reduce);
-
-        float m_new = fmaxf(m_max, block_max);
-        float correction = expf(m_max - m_new);
-
-        float block_sum = 0.0f;
-        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
-            float exp_val = expf(s_scores[k_local] - m_new);
-            s_scores[k_local] = exp_val;
-            block_sum += exp_val;
-        }
-        block_sum = block_reduce_sum(block_sum, s_reduce);
-
-        l_sum = correction * l_sum + block_sum;
-
-        for (int d = tid; d < hdim; d += blockDim.x) {
-            float prev_out = (k_start > 0) ? out[q_offset + d] : 0.0f;
-            float corrected_out = prev_out * correction;
-
-            float v_acc = 0.0f;
-            for (int k_local = 0; k_local < num_k; k_local++) {
-                int k_idx = k_start + k_local;
-                int v_offset = kv_base + k_idx * hdim + d;
-                v_acc += s_scores[k_local] * V[v_offset];
-            }
-
-            out[q_offset + d] = corrected_out + v_acc;
-        }
-
-        m_max = m_new;
-        __syncthreads();
-    }
-
-    for (int d = tid; d < hdim; d += blockDim.x) {
-        out[q_offset + d] /= l_sum;
-    }
-}
 
 // Separate kernel approach: first apply sinusoidal embeddings, then attention
 __global__ void apply_sinusoidal_embeddings(
