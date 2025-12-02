@@ -1,0 +1,270 @@
+=================================================
+RoPE-Fused Attention Kernel Test Suite
+=================================================
+
+========================================
+DEBUG: Isolating RoPE bug
+========================================
+
+RoPE cache for position 0:
+  d=0: cos=1.000000, sin=0.000000
+  d=1: cos=1.000000, sin=0.000000
+  d=2: cos=1.000000, sin=0.000000
+  d=3: cos=1.000000, sin=0.000000
+  d=4: cos=1.000000, sin=0.000000
+  d=5: cos=1.000000, sin=0.000000
+  d=6: cos=1.000000, sin=0.000000
+  d=7: cos=1.000000, sin=0.000000
+RoPE cache for position 1:
+  d=0: cos=0.540302, sin=0.841471
+  d=1: cos=0.540302, sin=0.841471
+  d=2: cos=0.647906, sin=0.761720
+  d=3: cos=0.647906, sin=0.761720
+  d=4: cos=0.731761, sin=0.681561
+  d=5: cos=0.731761, sin=0.681561
+  d=6: cos=0.796458, sin=0.604694
+  d=7: cos=0.796458, sin=0.604694
+
+Q_rope for query 0 (should be ~0.1 since pos=0 means identity):
+  d=0: 0.100000
+  d=1: 0.100000
+  d=2: 0.100000
+  d=3: 0.100000
+  d=4: 0.100000
+  d=5: 0.100000
+  d=6: 0.100000
+  d=7: 0.100000
+
+K_rope for key 0 (should be ~0.1):
+  d=0: 0.100000
+  d=1: 0.100000
+  d=2: 0.100000
+  d=3: 0.100000
+  d=4: 0.100000
+  d=5: 0.100000
+  d=6: 0.100000
+  d=7: 0.100000
+
+K_rope for key 1 (should be rotated):
+  d=0: -0.030117
+  d=1: 0.138177
+  d=2: -0.011381
+  d=3: 0.140963
+  d=4: 0.005020
+  d=5: 0.141332
+  d=6: 0.019176
+  d=7: 0.140115
+
+CPU: score(q=0, k=0) = 1.279999 (before scale)
+
+Output comparison for query 0:
+  dim |    GPU    |    CPU    |   diff   | ratio
+  ----|-----------|-----------|----------|------
+   32 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   33 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   34 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   35 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   36 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   37 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   38 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   39 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   40 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   41 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   42 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   43 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   44 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   45 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   46 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   47 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   48 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   49 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   50 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   51 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   52 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   53 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   54 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   55 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   56 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   57 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   58 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   59 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   60 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   61 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   62 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+   63 |  0.196843 |  0.100000 | 0.096843 | 1.968 ***
+
+--- BASIC CORRECTNESS TESTS ---
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 4
+  Head dimension: 8
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.008 ms
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 8
+  Head dimension: 16
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.008 ms
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 2
+  Num heads: 4
+  Sequence length: 32
+  Head dimension: 32
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.015 ms
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+--- LARGER DIMENSION TESTS ---
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 16
+  Head dimension: 64
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.011 ms
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 128
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.058 ms
+
+Checking results vs CPU...
+  Mismatch at index 34: GPU=0.091754, CPU=0.033554, diff=0.058200
+  Mismatch at index 35: GPU=0.263940, CPU=0.149454, diff=0.114486
+  Mismatch at index 36: GPU=0.316584, CPU=0.159390, diff=0.157193
+  Mismatch at index 39: GPU=0.139575, CPU=0.069844, diff=0.069732
+  Mismatch at index 41: GPU=0.112151, CPU=0.041582, diff=0.070569
+  Mismatch at index 42: GPU=-0.103623, CPU=-0.048645, diff=0.054978
+  Mismatch at index 43: GPU=0.181319, CPU=0.120760, diff=0.060558
+  Mismatch at index 44: GPU=0.135985, CPU=0.061694, diff=0.074292
+  Mismatch at index 46: GPU=0.201834, CPU=0.087664, diff=0.114170
+  Mismatch at index 51: GPU=-0.276313, CPU=-0.152915, diff=0.123398
+  Total mismatches: 4055 / 32768
+  Max difference: 0.278404
+
+✗ TEST FAILED
+
+--- TARGET DIMENSION TESTS ---
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 512
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.204 ms
+
+Checking results vs CPU...
+  Mismatch at index 33: GPU=-0.232941, CPU=-0.125868, diff=0.107073
+  Mismatch at index 34: GPU=0.154154, CPU=0.083296, diff=0.070858
+  Mismatch at index 35: GPU=-0.208760, CPU=-0.112802, diff=0.095958
+  Mismatch at index 37: GPU=-0.119854, CPU=-0.064762, diff=0.055092
+  Mismatch at index 38: GPU=0.128314, CPU=0.069334, diff=0.058981
+  Mismatch at index 43: GPU=-0.138597, CPU=-0.074890, diff=0.063707
+  Mismatch at index 44: GPU=0.154464, CPU=0.083464, diff=0.071001
+  Mismatch at index 46: GPU=-0.313016, CPU=-0.169136, diff=0.143880
+  Mismatch at index 52: GPU=0.167250, CPU=0.090372, diff=0.076877
+  Mismatch at index 54: GPU=0.196127, CPU=0.105976, diff=0.090151
+  Total mismatches: 7320 / 131072
+  Max difference: 0.275911
+
+✗ TEST FAILED
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 2048
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.899 ms
+
+Checking results vs CPU...
+  Mismatch at index 33: GPU=-0.152309, CPU=-0.078058, diff=0.074251
+  Mismatch at index 35: GPU=-0.112248, CPU=-0.056556, diff=0.055692
+  Mismatch at index 38: GPU=-0.194485, CPU=-0.100505, diff=0.093980
+  Mismatch at index 40: GPU=-0.146671, CPU=-0.074576, diff=0.072096
+  Mismatch at index 41: GPU=0.145022, CPU=0.074715, diff=0.070307
+  Mismatch at index 43: GPU=-0.189331, CPU=-0.097932, diff=0.091399
+  Mismatch at index 44: GPU=0.368601, CPU=0.189557, diff=0.179045
+  Mismatch at index 45: GPU=-0.261462, CPU=-0.135097, diff=0.126365
+  Mismatch at index 50: GPU=0.269235, CPU=0.138305, diff=0.130930
+  Mismatch at index 52: GPU=-0.190408, CPU=-0.097666, diff=0.092741
+  Total mismatches: 31276 / 524288
+  Max difference: 0.281260
+
+✗ TEST FAILED
+
+=================================================
+All tests completed!
+=================================================

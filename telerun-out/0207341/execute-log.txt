@@ -1,0 +1,237 @@
+=================================================
+RoPE-Fused Attention Kernel Test Suite
+=================================================
+
+========================================
+DEBUG: Isolating RoPE bug
+========================================
+
+RoPE cache for position 0:
+  d=0: cos=1.000000, sin=0.000000
+  d=1: cos=1.000000, sin=0.000000
+  d=2: cos=1.000000, sin=0.000000
+  d=3: cos=1.000000, sin=0.000000
+  d=4: cos=1.000000, sin=0.000000
+  d=5: cos=1.000000, sin=0.000000
+  d=6: cos=1.000000, sin=0.000000
+  d=7: cos=1.000000, sin=0.000000
+RoPE cache for position 1:
+  d=0: cos=0.540302, sin=0.841471
+  d=1: cos=0.540302, sin=0.841471
+  d=2: cos=0.647906, sin=0.761720
+  d=3: cos=0.647906, sin=0.761720
+  d=4: cos=0.731761, sin=0.681561
+  d=5: cos=0.731761, sin=0.681561
+  d=6: cos=0.796458, sin=0.604694
+  d=7: cos=0.796458, sin=0.604694
+
+Q_rope for query 0 (should be ~0.1 since pos=0 means identity):
+  d=0: 0.100000
+  d=1: 0.100000
+  d=2: 0.100000
+  d=3: 0.100000
+  d=4: 0.100000
+  d=5: 0.100000
+  d=6: 0.100000
+  d=7: 0.100000
+
+K_rope for key 0 (should be ~0.1):
+  d=0: 0.100000
+  d=1: 0.100000
+  d=2: 0.100000
+  d=3: 0.100000
+  d=4: 0.100000
+  d=5: 0.100000
+  d=6: 0.100000
+  d=7: 0.100000
+
+K_rope for key 1 (should be rotated):
+  d=0: -0.030117
+  d=1: 0.138177
+  d=2: -0.011381
+  d=3: 0.140963
+  d=4: 0.005020
+  d=5: 0.141332
+  d=6: 0.019176
+  d=7: 0.140115
+
+CPU: score(q=0, k=0) = 1.279999 (before scale)
+
+Output comparison for query 0:
+  dim |    GPU    |    CPU    |   diff   | ratio
+  ----|-----------|-----------|----------|------
+
+--- BASIC CORRECTNESS TESTS ---
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 4
+  Head dimension: 8
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.008 ms
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 8
+  Head dimension: 16
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.008 ms
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 2
+  Num heads: 4
+  Sequence length: 32
+  Head dimension: 32
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.015 ms
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+--- LARGER DIMENSION TESTS ---
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 16
+  Head dimension: 64
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.010 ms
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 128
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.053 ms
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+--- TARGET DIMENSION TESTS ---
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 512
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.180 ms
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+========================================
+Testing RoPE-fused attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 2048
+========================================
+
+Running RoPE-fused GPU kernel...
+Running CPU reference (RoPE + attention)...
+
+--- Performance Results ---
+RoPE-fused kernel time: 0.745 ms
+
+Checking results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+--- FUSED vs SEPARATE BENCHMARK ---
+
+========================================
+BENCHMARK: Fused vs Separate RoPE+Attention
+  bs=1, nh=4, seq=64, hdim=128
+========================================
+
+  Fused V3 (4 Q/block):     0.034 ms
+  Fused V4 (cached freq):   0.058 ms
+  Separate kernels:         0.034 ms
+  Best: Separate (0.034 ms)
+
+========================================
+BENCHMARK: Fused vs Separate RoPE+Attention
+  bs=1, nh=4, seq=64, hdim=512
+========================================
+
+  Fused V3 (4 Q/block):     0.086 ms
+  Fused V4 (cached freq):   0.097 ms
+  Separate kernels:         0.070 ms
+  Best: Separate (0.070 ms)
+
+========================================
+BENCHMARK: Fused vs Separate RoPE+Attention
+  bs=1, nh=4, seq=64, hdim=2048
+========================================
+
+  Fused V3 (4 Q/block):     0.312 ms
+  Fused V4 (cached freq):   0.273 ms
+  Separate kernels:         0.230 ms
+  Best: Separate (0.230 ms)
+
+=================================================
+All tests completed!
+=================================================

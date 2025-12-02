@@ -1,0 +1,64 @@
+================================================================================
+Investigating PyTorch Attention Backend Selection
+================================================================================
+
+GPU: NVIDIA RTX 4000 Ada Generation
+PyTorch version: 2.8.0+cu128
+CUDA version: 12.8
+
+Testing different backends for hdim=8192:
+
+Config: bs=1, nh=1, seq=16, hdim=8192
+
+auto                : 0.369 ms
+/tmp/tmpv5v270zh/investigate.py:56: UserWarning: Memory efficient kernel not used because: (Triggered internally at /pytorch/aten/src/ATen/native/transformers/cuda/sdp_utils.cpp:858.)
+  _ = F.scaled_dot_product_attention(Q, K, V)
+/tmp/tmpv5v270zh/investigate.py:56: UserWarning: Memory Efficient attention has been runtime disabled. (Triggered internally at /pytorch/aten/src/ATen/native/transformers/sdp_utils_cpp.h:552.)
+  _ = F.scaled_dot_product_attention(Q, K, V)
+/tmp/tmpv5v270zh/investigate.py:56: UserWarning: Flash attention kernel not used because: (Triggered internally at /pytorch/aten/src/ATen/native/transformers/cuda/sdp_utils.cpp:860.)
+  _ = F.scaled_dot_product_attention(Q, K, V)
+/tmp/tmpv5v270zh/investigate.py:56: UserWarning: Flash attention requires q,k,v to have the same last dimension and to be less than or equal to 256. Got Query.size(-1): 8192, Key.size(-1): 8192, Value.size(-1): 8192 instead. (Triggered internally at /pytorch/aten/src/ATen/native/transformers/cuda/sdp_utils.cpp:129.)
+  _ = F.scaled_dot_product_attention(Q, K, V)
+/tmp/tmpv5v270zh/investigate.py:56: UserWarning: CuDNN attention kernel not used because: (Triggered internally at /pytorch/aten/src/ATen/native/transformers/cuda/sdp_utils.cpp:862.)
+  _ = F.scaled_dot_product_attention(Q, K, V)
+/tmp/tmpv5v270zh/investigate.py:56: UserWarning: CuDNN attention has been runtime disabled. (Triggered internally at /pytorch/aten/src/ATen/native/transformers/cuda/sdp_utils.cpp:592.)
+  _ = F.scaled_dot_product_attention(Q, K, V)
+flash               : FAILED - No available kernel. Aborting execution.
+mem_efficient       : 0.369 ms
+math                : 0.127 ms
+
+Manual naive implementation:
+naive               : 0.084 ms
+
+================================================================================
+Analysis:
+================================================================================
+
+If FlashAttention is much slower than naive:
+- FlashAttention has overhead for very small batches
+- Your configuration (bs=1, seq=16) is too small for FlashAttention
+- Your custom kernel is optimized for this exact case
+
+If MATH backend is fastest:
+- PyTorch is using cuBLAS/cuDNN for matmuls
+- Still slower than your kernel due to multiple kernel launches
+
+Your kernel advantage:
+- Single fused kernel (no intermediate memory)
+- Optimized for small batch, large hdim
+- Online softmax reduces memory traffic
+
+
+================================================================================
+Test larger batch size for comparison:
+================================================================================
+
+Config: bs=8, nh=4, seq=128, hdim=2048
+
+PyTorch optimized: 0.509 ms
+Naive: 0.474 ms
+Speedup: 0.93x
+
+With larger batches, PyTorch optimizations should work better.
+Running investigation...
+
