@@ -4,196 +4,219 @@
 Fuse RoPE into attention kernel to eliminate redundant memory traffic for Q/K.
 
 ## Starting Point
-- Base kernel: `attention_fwd_kernel_large_hdim` in `attention_kernel.cu`
-- Performance: 1.48-2.02x speedup over baseline for hdim=512-4096
-- Kernel is memory-bound, so reducing memory traffic should directly improve performance
+- Base kernel: attention_fwd_kernel_large_hdim in attention_kernel.cu
+- Performance: 1.48-2.02x speedup over baseline (hdim=512-4096)
+- Memory-bound kernel → reducing memory traffic should help
 
 ---
 
-## Log
+## V1: Basic Implementation
 
-1. Created `attention_kernel_rope_fused.cu` with basic implementation. Precompute cos/sin on CPU, cache RoPE'd Q in shared memory, apply RoPE to K on-the-fly.
+1. Created attention_kernel_rope_fused.cu
+   - Precompute cos/sin on CPU
+   - Cache RoPE'd Q in shared memory
+   - Apply RoPE to K on-the-fly
 
-2. Test results: hdim=8,16,32,64 pass. hdim=128+ fail with GPU values ~2x CPU values. Pattern: GPU=-0.232941, CPU=-0.125868 (ratio ~1.85x). Errors start at index 33 for hdim=128, which is the second query (32*hdim + 33).
+2. Bug: hdim>=128 fail with GPU values ~2x CPU
+   - Pattern: GPU=-0.233, CPU=-0.126 (ratio 1.85x)
+   - Errors start at index 33 (dim 32 = warp boundary)
+   - 4055/32768 elements wrong (12%)
 
-3. Bug analysis: GPU values are ~1.85-2x CPU values. Errors start at dim 33-34 of first query, not all dimensions wrong. Pattern: 4055/32768 elements wrong (12%). Checking if it's related to thread/warp boundaries (dim 32 is warp boundary).
+3. Root cause: block_reduce_max/sum don't broadcast to all threads
+   - Only warp 0 gets correct value
+   - Other warps use stale values → wrong softmax normalization
 
-4. Added `debug_rope_attention()` function that uses uniform input (all 0.1) and prints intermediate values.
+4. Fix: broadcast final result via shared memory
+   - Added `shared[0] = val` after reduction
+   - Return `shared[0]` instead of local `val`
+   - All tests pass: hdim=8,16,32,64,128,512,2048
 
-5. Debug output reveals: dims 0-31 correct, dims 32-63 ALL have same wrong value (0.196843 vs 0.100000, ratio=1.968x). Error starts exactly at warp boundary (thread 32). This means block_reduce_max/sum don't broadcast result to all threads - only warp 0 gets correct value. Other warps use stale local values, causing wrong softmax normalization for dims 32+.
+5. Performance (no vectorization):
+   - hdim=128: 0.058ms
+   - hdim=512: 0.204ms
+   - hdim=2048: 0.901ms
 
-6. Fix: modify block_reduce_max and block_reduce_sum to broadcast final result via shared memory to all threads. Added `if (lane == 0) shared[0] = val` after final reduction, then `return shared[0]` instead of `return val`.
+6. Added float4 vectorization
+   - Rationale: memory-bound kernel, float4 loads 16B vs 4B
+   - Applied to Q RoPE load and K RoPE + dot product
+   - Results: 9-19% speedup (0.053ms, 0.178ms, 0.757ms)
 
-7. ALL TESTS PASS. Debug output shows no mismatches. Correctness verified for hdim=8,16,32,64,128,512,2048.
+7. Benchmark vs separate kernels - UNEXPECTED:
+   - Fused SLOWER than separate by 1.66-3.27x
+   - hdim=128: 0.053ms vs 0.032ms (1.66x slower)
+   - hdim=512: 0.183ms vs 0.069ms (2.65x slower)
+   - hdim=2048: 0.753ms vs 0.230ms (3.27x slower)
 
-8. Current performance (no float4 vectorization yet):
-   - hdim=128, seq=64: 0.058 ms
-   - hdim=512, seq=64: 0.204 ms  
-   - hdim=2048, seq=64: 0.901 ms
-
-9. Adding float4 vectorization. Rationale: kernel is memory-bound (~0.47 FLOPs/byte from earlier analysis). Float4 loads 16 bytes per instruction vs 4 bytes for scalar, better utilizing memory bandwidth. GPU memory transactions are 32-128 bytes, so scalar loads waste bandwidth. For RoPE: float4 = 4 elements = 2 dimension pairs, apply rotation to both pairs per load.
-
-10. Implemented float4 in two places:
-    - Q RoPE loading: each thread loads float4 (2 pairs), applies RoPE, stores float4 to s_Q_rope
-    - K RoPE + dot product: load K,cos,sin,Q_rope as float4, apply RoPE to K, accumulate dot product
-    - Added fallback for hdim not divisible by 4 (shouldn't happen in practice)
-
-11. Float4 results - ALL TESTS PASS. Performance improvement:
-    | hdim | before | after  | speedup |
-    |------|--------|--------|---------|
-    | 128  | 0.058  | 0.053  | 1.09x   |
-    | 512  | 0.204  | 0.178  | 1.15x   |
-    | 2048 | 0.901  | 0.757  | 1.19x   |
-    
-    Float4 gives 9-19% speedup as expected for memory-bound kernel.
-
-12. Added benchmark comparing fused vs separate (RoPE kernel + attention kernel). Separate approach requires:
-    - Extra GPU memory for Q_rope, K_rope buffers
-    - 3 kernel launches instead of 1
-    - Extra memory traffic: write Q_rope, K_rope then read them back
-
-13. UNEXPECTED RESULT: Fused is SLOWER than separate!
-    | hdim | Fused  | Separate | Fused/Separate |
-    |------|--------|----------|----------------|
-    | 128  | 0.053  | 0.032    | 1.66x slower   |
-    | 512  | 0.183  | 0.069    | 2.65x slower   |
-    | 2048 | 0.753  | 0.230    | 3.27x slower   |
-
-14. Analysis of why fusion is slower:
-    - Fused: For each of 64 K positions, loads cos/sin from global memory = 64 * hdim loads per query
-    - Separate: RoPE kernel loads cos/sin once per token, attention kernel is simple float4 dot products
-    - Fused has more memory traffic for cos/sin cache (loaded redundantly for each Q-K pair)
-    - Separate benefits from simpler attention kernel (no RoPE logic in hot path)
-    - The "saved" memory traffic from not storing Q_rope/K_rope is outweighed by repeated cos/sin loads
-
-15. Conclusion: Kernel fusion for RoPE+Attention is NOT beneficial in this case. The overhead of computing RoPE inline during attention outweighs the memory savings. Better to keep RoPE as a separate simple kernel.
-
-16. Attempting optimization: compute cos/sin ON THE FLY instead of loading from cache. Rationale:
-    - Current bottleneck: loading cos/sin from global memory for every Q-K pair
-    - Modern GPUs have fast special function units (SFUs) for sin/cos
-    - __sincosf() computes both in one instruction
-    - Trade memory bandwidth for compute - should help since kernel is memory-bound
-
-17. On-the-fly results - SIGNIFICANT IMPROVEMENT:
-    | hdim | Fused(cache) | Fused(V2) | Separate | Best        |
-    |------|--------------|-----------|----------|-------------|
-    | 128  | 0.061        | 0.035     | 0.042    | Fused V2!   |
-    | 512  | 0.178        | 0.112     | 0.070    | Separate    |
-    | 2048 | 0.739        | 0.423     | 0.230    | Separate    |
-
-18. Analysis:
-    - On-the-fly (V2) is 1.7-1.8x faster than cached cos/sin - confirms memory was the bottleneck
-    - For hdim=128: Fused V2 WINS (0.035 vs 0.042 = 1.2x speedup over separate)
-    - For hdim≥512: Separate still wins - the inner loop overhead (powf, sincosf per dimension pair) accumulates
-
-19. Conclusion: 
-    - For small hdim (≤128): Use fused V2 (on-the-fly cos/sin)
-    - For large hdim (≥512): Use separate RoPE + attention kernels
-    - The crossover point depends on SFU throughput vs memory bandwidth ratio
-
-20. Implementing multi-query fusion (V3): Process N queries per block to amortize K RoPE.
-    - Key change: Apply RoPE to K ONCE, reuse for all N queries in the block
-    - Shared memory: N × hdim for Q_rope (N=4, hdim=2048 → 32KB, fits!)
-    - Expected reduction: sincosf calls reduced by factor of N
-
-21. V3 Results - ALL TESTS PASS. Performance:
-    | hdim | V2 (1Q) | V3 (4Q) | Separate | V3 vs V2 |
-    |------|---------|---------|----------|----------|
-    | 128  | 0.036   | 0.035   | 0.034    | 3% faster |
-    | 512  | 0.116   | 0.091   | 0.077    | 22% faster |
-    | 2048 | 0.428   | 0.313   | 0.234    | 27% faster |
-
-22. Analysis: V3 significantly improves over V2, especially for large hdim (27% faster). 
-    However, separate STILL wins because:
-    - V3 does K RoPE O(seq_q/4 × seq_k) times = 16 × 64 = 1024 times
-    - Separate does K RoPE O(seq_k) times = 64 times
-    - Gap: 16x more K RoPE in V3 vs separate
-    - Would need seq_q queries per block to match, but shared memory can't fit 64 × 2048 × 4 = 512KB
-
-23. FINAL CONCLUSION: Kernel fusion for RoPE+Attention does NOT beat separate kernels for this workload.
-    The fundamental issue is that fusing requires redundant computation that scales with O(seq_q × seq_k),
-    while separate preprocessing scales with O(seq_q + seq_k). The shared memory constraint prevents
-    caching enough data to eliminate this redundancy. Use separate RoPE + attention kernels.
-
-24. Trying V4: Cache frequencies + cooperative K processing. Two optimizations combined:
-    a) Precompute freq[i] = 1/pow(10000, 2i/hdim) at block start → removes powf from inner loop
-    b) All threads cooperate on each K position instead of one thread per K → enables caching cos/sin for one K at a time
-
-25. V4 Results:
-    | hdim | V3 (4Q) | V4 (cached freq) | Separate | Notes                |
-    |------|---------|------------------|----------|----------------------|
-    | 128  | 0.034   | 0.058            | 0.034    | V4 1.7x slower       |
-    | 512  | 0.086   | 0.097            | 0.070    | V4 slightly slower   |
-    | 2048 | 0.312   | 0.273            | 0.230    | V4 12.5% faster than V3 |
-
-26. Analysis: V4's frequency caching ONLY helps for large hdim (2048). For smaller hdim:
-    - Shared memory overhead for freq array outweighs powf() savings
-    - Extra synchronization barriers add latency
-    - For hdim=2048, enough powf() calls to make caching worthwhile
-
-27. **FINAL STATUS**: After 4 optimization attempts, separate kernels still outperform fusion:
-    - Best fused (V3 at hdim=128): 0.034ms vs separate 0.034ms = tie
-    - Best fused (V3 at hdim=512): 0.086ms vs separate 0.070ms = 23% slower
-    - Best fused (V4 at hdim=2048): 0.273ms vs separate 0.230ms = 19% slower
-    
-    Root cause: Fused requires O(seq_q × seq_k × hdim) RoPE operations for K, while separate
-    does O(seq_k × hdim). This 64x multiplier (seq_q=64) cannot be overcome without caching
-    all K_rope in shared memory, which would require 64 × 2048 × 4 = 512KB (limit is 48KB).
+8. Analysis: why fusion fails
+   - Fused loads cos/sin from global mem for each Q-K pair (64 × hdim loads per query)
+   - Separate: RoPE kernel loads cos/sin once per token, attention is simple dot products
+   - Saved memory from not storing Q_rope/K_rope outweighed by repeated cos/sin loads
 
 ---
 
-## Why Fusion Cannot Win: Fundamental Analysis
+## V2: On-the-fly cos/sin
 
-### The Core Problem: Work Multiplication
+9. Compute cos/sin on-the-fly instead of loading from cache
+   - Use __sincosf() (fast SFU)
+   - Trade memory bandwidth for compute
 
-**Separate kernels:**
-```
-RoPE kernel:  Apply RoPE to each K token ONCE
-              Work = seq_k × hdim = 64 × 2048 = 131K ops
+10. Results - significant improvement:
+    - hdim=128: 0.035ms (WINS over separate 0.042ms - 1.2x speedup!)
+    - hdim=512: 0.112ms (still slower than separate 0.070ms)
+    - hdim=2048: 0.423ms (still slower than separate 0.230ms)
 
-Attention:    For each Q-K pair, just do dot product
-              Work = seq_q × seq_k × hdim = 64 × 64 × 2048 = 8.4M ops
-```
+11. Conclusion: works for small hdim only
+    - hdim<=128: use fused V2
+    - hdim>=512: use separate (inner loop overhead accumulates)
 
-**Fused kernel:**
-```
-For each query:
-    For each key:
-        Apply RoPE to K (AGAIN)  ← This is the problem
-        Compute dot product
+---
 
-K RoPE work = seq_q × seq_k × hdim = 64 × 64 × 2048 = 8.4M ops
-```
+## V3: Multi-query per block
 
-The fused approach does **64× more K RoPE operations** (once per query instead of once total).
+12. Process 4 queries per block to amortize K RoPE
+    - Apply RoPE to K once, reuse for all 4 queries
+    - Shared mem: 4 × hdim for Q_rope (4 × 2048 = 32KB, fits)
 
-### Why Can't We Cache K_rope?
+13. Results: 22-27% faster than V2, still slower than separate
+    - hdim=128: 0.035ms (tie with separate 0.034ms)
+    - hdim=512: 0.091ms (slower than separate 0.077ms)
+    - hdim=2048: 0.313ms (slower than separate 0.234ms)
 
-| Strategy | Memory Needed | Limit | Result |
-|----------|--------------|-------|--------|
-| Global memory | Works | ∞ | This IS the separate approach |
-| Shared memory | 64 × 2048 × 4 = 512KB | 48KB | Doesn't fit |
+14. Analysis: still O(seq_q/4 × seq_k) K RoPE recomputation
+    - V3: 16 × 64 = 1024 K RoPE ops
+    - Separate: 64 K RoPE ops
+    - Gap: 16x more K RoPE
+    - Would need 64 queries/block but shared mem limit is 48KB (need 512KB)
 
-We can only fit ~4 K tokens' worth of K_rope in shared memory. V3 processes 4 queries per block
-to amortize K_rope, but that's still 16× more work than separate.
+---
 
-### What About Memory Savings?
+## V4: Cached frequencies
 
-Fusion saves ~2MB traffic (no Q_rope/K_rope buffers). But:
-- The kernel is memory-bound, so extra compute should be "free"
-- But RoPE isn't free - requires sincosf() or cos/sin table loads
-- 64× more sincosf calls overwhelm the 2MB memory savings
+15. Precompute freq[i] = 1/pow(10000, 2i/hdim) at block start
+    - Removes powf from inner loop
+    - All threads cooperate on each K position
 
-### Conclusion
+16. Results: only helps for hdim=2048
+    - hdim=128: 0.058ms (1.7x slower than V3)
+    - hdim=512: 0.097ms (slightly slower)
+    - hdim=2048: 0.273ms (12.5% faster than V3, still slower than separate)
 
-This is an **algorithmic constraint**, not an optimization gap:
-- Fusion multiplies K RoPE work by seq_q
-- Caching K_rope in global memory = separate kernels
-- Caching K_rope in shared memory = doesn't fit
-- **No optimization will fix this** for multi-query attention with large seq_q
+17. Analysis: shared mem overhead + sync barriers outweigh powf savings for small hdim
 
-### When Fusion WOULD Help
+---
 
-1. **seq_q = 1** (autoregressive inference): K RoPE done once anyway
-2. **Tiny hdim (≤128)**: RoPE overhead small, fusion saves kernel launch latency
-3. **Memory-capacity constrained**: If Q_rope/K_rope buffers don't fit in GPU memory
+## V5: K in shared memory (FAILED)
+
+18. Load full K tile [BLOCK_K × hdim] into shared memory
+    - Apply RoPE in registers during dot product
+
+19. Results: CATASTROPHIC for large hdim
+    - hdim=128: 0.046ms (1.4x slower)
+    - hdim=512: 0.261ms (3.8x slower)
+    - hdim=2048: 1.940ms (8.5x slower!)
+
+20. Root cause: shared memory overflow
+    - Available: 40KB = 10000 floats
+    - Overhead (Q_rope, freq, reduce): 3104 floats
+    - BLOCK_K = (10000-3104)/(2048+1) = 3.36 → 4
+    - Only 4 K vectors per tile → 16 tiles total (massive sync overhead)
+
+---
+
+## V6: Dimension tiling
+
+21. Tile HEAD DIMENSION instead of just K sequence
+    - Load K in chunks [BLOCK_K × TILE_D] where TILE_D=256
+    - For hdim=2048: 8 dimension tiles
+    - BLOCK_K=32 instead of 4 → only 2 K tiles instead of 16
+
+22. Results: 3.3x faster than V5, still slower than separate
+    - hdim=128: 0.050ms (1.61x slower)
+    - hdim=512: 0.161ms (2.33x slower)
+    - hdim=2048: 0.583ms (2.52x slower, but 3.3x faster than V5)
+
+23. Fundamental limitation: O(seq_q × seq_k) K RoPE recomputation
+    - Fused: 64 × 64 = 4096 K RoPE ops
+    - Separate: 64 K RoPE ops
+    - Gap: 64x more operations
+    - Cannot cache all K_rope (need 512KB, have 48KB)
+
+---
+
+## Partial Rotation (rotary_dim)
+
+24. Expert feedback: real LLMs only rotate subset of dimensions
+    - LLaMA configs:
+      * hdim=128, rotary_dim=64 (50%)
+      * hdim=256, rotary_dim=128 (50%)
+      * hdim=2048, rotary_dim=128 (6%)
+
+25. Updated V6 to only rotate first rotary_dim dimensions
+    - Rest copied as-is (no sin/cos/powf)
+    - Shared mem savings: s_freq now [rotary_dim/2] not [hdim/2]
+
+26. Results: NO significant improvement
+    - hdim=128, rotary_dim=64: 0.055ms (1.73x slower)
+    - hdim=512, rotary_dim=128: 0.159ms (2.32x slower)
+    - hdim=2048, rotary_dim=128: 0.567ms (2.50x slower)
+
+27. Why: O(seq_q × seq_k) recomputation still dominates
+    - For hdim=2048, rotary_dim=128:
+      * Separate: 64Q + 64K = 128 tokens × 128 dims = 16k ops
+      * Fused V6: 64 × 64 × 128 = 524k ops
+      * Still 32x more work
+
+28. Insight: partial rotation necessary for decode workloads (1-4 queries)
+    - Our workload: 64×64 symmetric prefill
+    - FlashInfer's workload: 1-4 queries × 8k-32k KV cache
+
+---
+
+## V7: HYBRID (Pre-rotated K + Fused Q-RoPE)
+
+29. Middle ground approach:
+    - Pre-rotate K using separate kernel (O(seq_k))
+    - Fuse Q-RoPE into attention (O(seq_q))
+    - Total: O(seq_q + seq_k) = same as separate
+
+30. Implementation:
+    - Kernel accepts already-rotated K
+    - Apply RoPE to Q on-the-fly during load
+    - Simple float4 dot product for Q·K (K already rotated)
+    - BLOCK_K=64 (no dimension tiling needed)
+
+31. Results: SUCCESS - beats separate across all configs
+    - hdim=128, rotary_dim=64: 0.020ms (1.66x faster than separate)
+    - hdim=512, rotary_dim=128: 0.047ms (1.45x faster)
+    - hdim=2048, rotary_dim=128: 0.162ms (1.40x faster)
+
+32. Why V7 wins:
+    - No O(seq_q × seq_k) K RoPE recomputation
+    - Saves one kernel launch (no separate Q RoPE)
+    - Better cache locality (Q RoPE + dot product together)
+    - No Q_rope buffer needed
+
+33. Performance breakdown (hdim=2048, rotary_dim=128):
+    - V6 (full fusion): 0.574ms
+      * K RoPE: 64 × 64 × 128 = 524k ops (kills performance)
+    - Separate: 0.226ms
+      * Q RoPE + K RoPE + Attention: 3 kernel launches
+    - V7 (hybrid): 0.162ms
+      * K RoPE (separate) + Q RoPE+Attention (fused): 2 kernels
+
+---
+
+## Final Conclusions
+
+34. Full fusion (V2-V6) fails due to O(seq_q × seq_k) K recomputation
+    - 64x multiplier cannot be overcome with shared mem (need 512KB, have 48KB)
+
+35. Hybrid approach (V7) wins by avoiding redundant computation
+    - Pre-rotate K once (separate kernel)
+    - Fuse only Q-RoPE into attention
+    - 1.4-1.66x speedup over separate
+
+36. Key insight: only fuse what benefits from fusion
+    - Q-RoPE fuses well with attention (better cache locality, saved launches)
+    - K-RoPE belongs in separate preprocessing
+    - Matches FlashInfer's production approach for decode
