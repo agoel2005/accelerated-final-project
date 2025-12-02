@@ -116,10 +116,11 @@ __global__ void attention_fwd_kernel_large_hdim(
 
     const int q_offset = qkv_base + q_idx * hdim;
 
+    //running stats
     float m_max = -INFINITY;
     float l_sum = 0.0f;
 
-    // Process K,V in blocks using online softmax
+    // online softmax chunks K/V into blocks
     for (int k_start = 0; k_start < seq_k; k_start += BLOCK_N) {
         const int k_end = min(k_start + BLOCK_N, seq_k);
         const int num_k = k_end - k_start;
@@ -139,7 +140,8 @@ __global__ void attention_fwd_kernel_large_hdim(
                     score += q_vec.x * k_vec.x + q_vec.y * k_vec.y +
                              q_vec.z * k_vec.z + q_vec.w * k_vec.w;
                 }
-            } else {
+            } 
+            else {
                 for (int d = 0; d < hdim; d++) {
                     score += Q[q_offset + d] * K[k_offset + d];
                 }
@@ -150,7 +152,7 @@ __global__ void attention_fwd_kernel_large_hdim(
         }
         __syncthreads();
 
-        // Find max in this block
+        // block max
         float block_max = -INFINITY;
         for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
             block_max = fmaxf(block_max, s_scores[k_local]);
@@ -197,6 +199,25 @@ __global__ void attention_fwd_kernel_large_hdim(
         out[q_offset + d] /= l_sum;
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // REMOVED BUGGY attention_fwd_kernel_optimized - was causing test failures
 // The kernel had issues with hdim > 128 due to register array sizing

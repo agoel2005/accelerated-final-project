@@ -553,7 +553,7 @@ __global__ void attention_fwd_kernel_sinusoidal_fused_v4(
     }
 }
 
-// Version 5: V4 + float4 vectorization + __sincosf() for simultaneous sin/cos
+// Version 5: float4 + sincos simultaneous 
 template<int BLOCK_N>
 __global__ void attention_fwd_kernel_sinusoidal_fused_v5(
     const float* __restrict__ Q,
@@ -601,19 +601,19 @@ __global__ void attention_fwd_kernel_sinusoidal_fused_v5(
 
             float score = 0.0f;
 
-            // Vectorized with __sincosf for better throughput
             if (hdim % 4 == 0) {
+                //use float 4
                 for (int d = 0; d < hdim; d += 4) {
                     float4 q_vec = *reinterpret_cast<const float4*>(&Q[q_offset + d]);
                     float4 k_vec = *reinterpret_cast<const float4*>(&K[k_offset + d]);
                     float4 freq_vec = *reinterpret_cast<const float4*>(&s_freqs[d]);
 
-                    // Compute all sin/cos using __sincosf
                     float sin_q0, cos_q0, sin_k0, cos_k0;
                     float sin_q1, cos_q1, sin_k1, cos_k1;
                     float sin_q2, cos_q2, sin_k2, cos_k2;
                     float sin_q3, cos_q3, sin_k3, cos_k3;
 
+                    //compute simultaneously to speed up 
                     __sincosf(q_idx * freq_vec.x, &sin_q0, &cos_q0);
                     __sincosf(k_idx * freq_vec.x, &sin_k0, &cos_k0);
                     __sincosf(q_idx * freq_vec.y, &sin_q1, &cos_q1);
@@ -623,7 +623,6 @@ __global__ void attention_fwd_kernel_sinusoidal_fused_v5(
                     __sincosf(q_idx * freq_vec.w, &sin_q3, &cos_q3);
                     __sincosf(k_idx * freq_vec.w, &sin_k3, &cos_k3);
 
-                    // d+0 (even): sin, d+1 (odd): cos, d+2 (even): sin, d+3 (odd): cos
                     float q_emb_0 = q_vec.x + sin_q0;
                     float k_emb_0 = k_vec.x + sin_k0;
                     float q_emb_1 = q_vec.y + cos_q1;
@@ -662,6 +661,8 @@ __global__ void attention_fwd_kernel_sinusoidal_fused_v5(
             s_scores[k_local] = score;
         }
         __syncthreads();
+
+        //normal attention from here
 
         float block_max = -INFINITY;
         for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
