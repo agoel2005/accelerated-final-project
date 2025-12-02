@@ -1,0 +1,176 @@
+=================================================
+Sinusoidal Attention Fusion Benchmark
+=================================================
+
+*** Testing hdim=512 ***
+
+========================================
+Testing Sinusoidal Attention:
+  Batch size: 1, Num heads: 4
+  Sequence length: 64, Hidden dim: 512
+========================================
+
+Testing FUSED V1 (table lookups)...
+Testing FUSED V2 (float4 vectorization)...
+Testing FUSED V3 (on-the-fly sin/cos)...
+Testing FUSED V4 (cached frequencies)...
+Testing FUSED V5 (float4 + __sincosf + cached freqs)...
+Testing SEPARATE kernel approach...
+Running CPU reference...
+
+========================================
+PERFORMANCE RESULTS
+========================================
+Fused V1 (table):      0.242 ms [baseline]
+Fused V2 (float4):     0.160 ms  (1.51x vs V1)
+Fused V3 (on-fly):     0.114 ms  (2.13x vs V1)
+Fused V4 (cached freq):0.114 ms  (2.13x vs V1)
+Fused V5 (v4+sincosf): 0.058 ms  (4.21x vs V1)
+Separate:              0.118 ms  (2.05x vs V1)
+========================================
+** BEST: V5 **
+========================================
+
+Checking fused V1 vs CPU...
+  Max difference: 0.000001 (within tolerance 0.050000)
+
+Checking fused V2 vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+Checking fused V3 vs CPU...
+  Max difference: 0.000002 (within tolerance 0.050000)
+
+Checking fused V4 vs CPU...
+  Max difference: 0.000002 (within tolerance 0.050000)
+
+Checking fused V5 vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000001 (within tolerance 0.050000)
+
+✓ ALL FUSED KERNELS PASSED
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing Sinusoidal Attention:
+  Batch size: 1, Num heads: 4
+  Sequence length: 64, Hidden dim: 2048
+========================================
+
+Testing FUSED V1 (table lookups)...
+Testing FUSED V2 (float4 vectorization)...
+Testing FUSED V3 (on-the-fly sin/cos)...
+Testing FUSED V4 (cached frequencies)...
+Testing FUSED V5 (float4 + __sincosf + cached freqs)...
+Testing SEPARATE kernel approach...
+Running CPU reference...
+
+========================================
+PERFORMANCE RESULTS
+========================================
+Fused V1 (table):      0.907 ms [baseline]
+Fused V2 (float4):     0.594 ms  (1.53x vs V1)
+Fused V3 (on-fly):     0.406 ms  (2.23x vs V1)
+Fused V4 (cached freq):0.409 ms  (2.22x vs V1)
+Fused V5 (v4+sincosf): 0.219 ms  (4.14x vs V1)
+Separate:              0.410 ms  (2.21x vs V1)
+========================================
+** BEST: V5 **
+========================================
+
+Checking fused V1 vs CPU...
+  Max difference: 0.000003 (within tolerance 0.050000)
+
+Checking fused V2 vs CPU...
+  Max difference: 0.000024 (within tolerance 0.050000)
+
+Checking fused V3 vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+Checking fused V4 vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+Checking fused V5 vs CPU...
+  Max difference: 0.000024 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Mismatch at index 0: GPU=0.039004, CPU=-0.837292, diff=0.876296
+  Mismatch at index 1: GPU=-0.015041, CPU=0.054566, diff=0.069607
+  Mismatch at index 2: GPU=0.032233, CPU=0.389271, diff=0.357038
+  Mismatch at index 3: GPU=-0.059905, CPU=-0.481516, diff=0.421611
+  Mismatch at index 4: GPU=0.012041, CPU=0.432605, diff=0.420565
+  Mismatch at index 7: GPU=-0.002494, CPU=-0.684518, diff=0.682024
+  Mismatch at index 8: GPU=0.070973, CPU=0.313766, diff=0.242794
+  Mismatch at index 9: GPU=0.017607, CPU=0.805927, diff=0.788319
+  Mismatch at index 11: GPU=-0.023176, CPU=-0.211776, diff=0.188600
+  Mismatch at index 12: GPU=0.045398, CPU=-0.313660, diff=0.359058
+  Total mismatches: 463098 / 524288
+  Max difference: 1.038059
+
+✓ ALL FUSED KERNELS PASSED
+
+*** Testing hdim=4096 ***
+
+========================================
+Testing Sinusoidal Attention:
+  Batch size: 1, Num heads: 2
+  Sequence length: 32, Hidden dim: 4096
+========================================
+
+Testing FUSED V1 (table lookups)...
+Testing FUSED V2 (float4 vectorization)...
+Testing FUSED V3 (on-the-fly sin/cos)...
+Testing FUSED V4 (cached frequencies)...
+Testing FUSED V5 (float4 + __sincosf + cached freqs)...
+Testing SEPARATE kernel approach...
+Running CPU reference...
+
+========================================
+PERFORMANCE RESULTS
+========================================
+Fused V1 (table):      0.376 ms [baseline]
+Fused V2 (float4):     0.256 ms  (1.47x vs V1)
+Fused V3 (on-fly):     0.220 ms  (1.71x vs V1)
+Fused V4 (cached freq):0.231 ms  (1.63x vs V1)
+Fused V5 (v4+sincosf): 0.149 ms  (2.53x vs V1)
+Separate:              0.200 ms  (1.89x vs V1)
+========================================
+** BEST: V5 **
+========================================
+
+Checking fused V1 vs CPU...
+  Max difference: 0.000002 (within tolerance 0.050000)
+
+Checking fused V2 vs CPU...
+  Max difference: 0.000042 (within tolerance 0.050000)
+
+Checking fused V3 vs CPU...
+  Max difference: 0.000006 (within tolerance 0.050000)
+
+Checking fused V4 vs CPU...
+  Max difference: 0.000006 (within tolerance 0.050000)
+
+Checking fused V5 vs CPU...
+  Max difference: 0.000038 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Mismatch at index 0: GPU=0.013630, CPU=-0.163792, diff=0.177422
+  Mismatch at index 1: GPU=-0.050541, CPU=-0.202765, diff=0.152224
+  Mismatch at index 2: GPU=-0.101827, CPU=0.092675, diff=0.194502
+  Mismatch at index 3: GPU=0.034202, CPU=0.431643, diff=0.397441
+  Mismatch at index 4: GPU=-0.001852, CPU=0.281562, diff=0.283414
+  Mismatch at index 5: GPU=-0.154796, CPU=-0.625699, diff=0.470903
+  Mismatch at index 6: GPU=0.089595, CPU=-0.087741, diff=0.177336
+  Mismatch at index 7: GPU=-0.044483, CPU=0.223523, diff=0.268005
+  Mismatch at index 8: GPU=-0.074596, CPU=-0.932365, diff=0.857769
+  Mismatch at index 9: GPU=-0.054083, CPU=-0.342118, diff=0.288036
+  Total mismatches: 234174 / 262144
+  Max difference: 1.121267
+
+✓ ALL FUSED KERNELS PASSED
+
+=================================================
+All tests completed!
+=================================================
