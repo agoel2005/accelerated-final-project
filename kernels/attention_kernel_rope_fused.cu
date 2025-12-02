@@ -937,6 +937,7 @@ __global__ void attention_fwd_kernel_rope_fused_v7_hybrid(
     __syncthreads();
 
     // Apply RoPE to Q and store in shmem
+    // Process pairs (d,d+1) together
     for (int d = tid * 2; d < rotary_dim; d += blockDim.x * 2) {
         int pair_idx = d / 2;
         float theta = q_pos * s_freq[pair_idx];
@@ -950,7 +951,7 @@ __global__ void attention_fwd_kernel_rope_fused_v7_hybrid(
         s_Q_rope[d + 1] = q_even * sin_val + q_odd * cos_val;
     }
 
-    // Copy non-rotated dimensions to shmem
+    // Copy non-rotated dimensions to shmem (partial rotation)
     for (int d = rotary_dim + tid; d < hdim; d += blockDim.x) {
         s_Q_rope[d] = Q[q_offset + d];
     }
@@ -991,11 +992,13 @@ __global__ void attention_fwd_kernel_rope_fused_v7_hybrid(
         }
         __syncthreads();
 
-        // Find max score in this tile and subtract from all scores, stability trick
+        // Online softmax
         float block_max = -INFINITY;
         for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
             block_max = fmaxf(block_max, s_scores[k_local]);
         }
+
+        // Reduce max across threads
         block_max = block_reduce_max(block_max, s_reduce);
 
         float m_new = fmaxf(m_max, block_max);
