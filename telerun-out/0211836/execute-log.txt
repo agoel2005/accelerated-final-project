@@ -1,0 +1,73 @@
+=================================================
+BF16 Tensor Core Attention Benchmark
+=================================================
+
+*** Testing hdim=512 ***
+
+========================================
+Testing BF16 Tensor Core Attention:
+  Batch size: 1, Num heads: 4
+  Sequence length: 64, Hidden dim: 512
+========================================
+
+Running CPU reference...
+
+========================================
+PERFORMANCE RESULTS
+========================================
+BF16 Tensor Core: 0.038 ms
+Throughput: 0.89 TFLOPS
+========================================
+
+Checking BF16 kernel vs CPU...
+  Max difference: 0.001626 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing BF16 Tensor Core Attention:
+  Batch size: 1, Num heads: 4
+  Sequence length: 64, Hidden dim: 2048
+========================================
+
+Running CPU reference...
+
+========================================
+PERFORMANCE RESULTS
+========================================
+BF16 Tensor Core: 0.143 ms
+Throughput: 0.94 TFLOPS
+========================================
+
+Checking BF16 kernel vs CPU...
+  Max difference: 0.001959 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+*** Testing hdim=4096 ***
+
+========================================
+Testing BF16 Tensor Core Attention:
+  Batch size: 1, Num heads: 2
+  Sequence length: 32, Hidden dim: 4096
+========================================
+
+Running CPU reference...
+
+========================================
+PERFORMANCE RESULTS
+========================================
+BF16 Tensor Core: 0.096 ms
+Throughput: 0.35 TFLOPS
+========================================
+
+Checking BF16 kernel vs CPU...
+  Max difference: 0.002075 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+=================================================
+All tests completed!
+=================================================

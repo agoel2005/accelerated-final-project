@@ -1,0 +1,6 @@
+/tmp/tmplyvpwq40/source.cu(71): warning #177-D: variable "q_pos" was declared but never referenced
+      const int q_pos = idx % seq_q;
+                ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+

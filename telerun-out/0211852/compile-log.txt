@@ -1,0 +1,3 @@
+ptxas /tmp/tmpxft_00027099_00000000-6_source.ptx, line 467; error   : Argument vector size mismatch for instruction 'mma'
+ptxas /tmp/tmpxft_00027099_00000000-6_source.ptx, line 467; error   : Argument vector size mismatch for instruction 'mma'
+ptxas fatal   : Ptx assembly aborted due to errors

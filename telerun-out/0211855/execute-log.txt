@@ -1,0 +1,42 @@
+=================================================
+BF16 ACTUAL MMA Tensor Core Attention
+=================================================
+
+===== BF16 ACTUAL MMA Tensor Core Attention =====
+  bs=1 nh=4 seq=64 hdim=512
+Time: 0.088 ms
+Performance: 0.38 TFLOPS
+  Max difference: 0.079521 (tolerance 0.150000)
+✓ ACTUAL TENSOR CORES WORKING!
+
+===== BF16 ACTUAL MMA Tensor Core Attention =====
+  bs=1 nh=4 seq=64 hdim=2048
+Time: 0.487 ms
+Performance: 0.28 TFLOPS
+  Max difference: 0.001294 (tolerance 0.150000)
+✓ ACTUAL TENSOR CORES WORKING!
+
+===== BF16 ACTUAL MMA Tensor Core Attention =====
+  bs=1 nh=2 seq=32 hdim=4096
+Time: 0.343 ms
+Performance: 0.10 TFLOPS
+  Max difference: 0.001457 (tolerance 0.150000)
+✓ ACTUAL TENSOR CORES WORKING!
+
+*** Testing VERY LARGE hdim=8192 ***
+
+===== BF16 ACTUAL MMA Tensor Core Attention =====
+  bs=1 nh=1 seq=16 hdim=8192
+Time: 0.336 ms
+Performance: 0.02 TFLOPS
+  Max difference: 0.002257 (tolerance 0.150000)
+✓ ACTUAL TENSOR CORES WORKING!
+
+*** Testing EXTREME hdim=16384 ***
+
+===== BF16 ACTUAL MMA Tensor Core Attention =====
+  bs=1 nh=1 seq=8 hdim=16384
+Time: 0.339 ms
+Performance: 0.01 TFLOPS
+  Max difference: 0.002714 (tolerance 0.150000)
+✓ ACTUAL TENSOR CORES WORKING!

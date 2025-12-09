@@ -1,0 +1,45 @@
+=================================================
+BF16 MMA TILED Tensor Core Attention
+Tiles hdim like lab6 tiles K dimension
+=================================================
+
+===== BF16 MMA TILED Tensor Core Attention =====
+  bs=1 nh=4 seq=64 hdim=512
+Time: 0.090 ms
+Performance: 0.37 TFLOPS
+  Max difference: 0.079521 (tolerance 0.150000)
+✓ TILED TENSOR CORES WORKING!
+
+===== BF16 MMA TILED Tensor Core Attention =====
+  bs=1 nh=4 seq=64 hdim=2048
+Time: 0.337 ms
+Performance: 0.40 TFLOPS
+  Max difference: 0.088527 (tolerance 0.150000)
+✓ TILED TENSOR CORES WORKING!
+
+===== BF16 MMA TILED Tensor Core Attention =====
+  bs=1 nh=2 seq=32 hdim=4096
+Time: 0.286 ms
+Performance: 0.12 TFLOPS
+  Max difference: 0.121528 (tolerance 0.150000)
+✓ TILED TENSOR CORES WORKING!
+
+*** Testing VERY LARGE hdim=8192 ***
+
+===== BF16 MMA TILED Tensor Core Attention =====
+  bs=1 nh=1 seq=16 hdim=8192
+Time: 0.290 ms
+Performance: 0.03 TFLOPS
+  Max difference: 0.158069 (tolerance 0.150000)
+  Errors: 3 / 131072
+✗ FAILED
+
+*** Testing EXTREME hdim=16384 ***
+
+===== BF16 MMA TILED Tensor Core Attention =====
+  bs=1 nh=1 seq=8 hdim=16384
+Time: 0.311 ms
+Performance: 0.01 TFLOPS
+  Max difference: 0.198787 (tolerance 0.150000)
+  Errors: 158 / 131072
+✗ FAILED

@@ -1,0 +1,55 @@
+=================================================
+BF16 Attention Benchmark
+=================================================
+
+*** Testing hdim=512 ***
+
+========================================
+Testing BF16 Attention:
+  Batch size: 1, Num heads: 4
+  Sequence length: 64, Hidden dim: 512
+========================================
+
+BF16 kernel time: 0.041 ms
+Performance: 0.82 TFLOPS
+
+Checking correctness...
+  Max difference: 0.001101 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing BF16 Attention:
+  Batch size: 1, Num heads: 4
+  Sequence length: 64, Hidden dim: 2048
+========================================
+
+BF16 kernel time: 0.140 ms
+Performance: 0.96 TFLOPS
+
+Checking correctness...
+  Max difference: 0.001294 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+*** Testing hdim=4096 ***
+
+========================================
+Testing BF16 Attention:
+  Batch size: 1, Num heads: 2
+  Sequence length: 32, Hidden dim: 4096
+========================================
+
+BF16 kernel time: 0.098 ms
+Performance: 0.34 TFLOPS
+
+Checking correctness...
+  Max difference: 0.001457 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+=================================================
+All tests completed!
+=================================================

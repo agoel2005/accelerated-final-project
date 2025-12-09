@@ -1,0 +1,18 @@
+/tmp/tmpznhjm7ph/source.cu(120): warning #177-D: variable "warp_id" was declared but never referenced
+      const int warp_id = tid / 32;
+                ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/tmp/tmpznhjm7ph/source.cu(121): warning #177-D: variable "lane_id" was declared but never referenced
+      const int lane_id = tid % 32;
+                ^
+
+/tmp/tmpznhjm7ph/source.cu(133): warning #177-D: variable "s_q_tile" was declared but never referenced
+      __attribute__((shared)) bfloat16 s_q_tile[WMMA_M * WMMA_K];
+                                       ^
+
+/tmp/tmpznhjm7ph/source.cu(134): warning #177-D: variable "s_k_tile" was declared but never referenced
+      __attribute__((shared)) bfloat16 s_k_tile[WMMA_K * WMMA_N];
+                                       ^
+

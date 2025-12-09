@@ -1,0 +1,14 @@
+=================================================
+BF16 ACTUAL MMA Tensor Core Attention
+=================================================
+
+===== BF16 ACTUAL MMA Tensor Core Attention =====
+  bs=1 nh=4 seq=64 hdim=512
+Time: 0.088 ms
+Performance: 0.38 TFLOPS
+  Max difference: 0.079521 (tolerance 0.150000)
+✓ ACTUAL TENSOR CORES WORKING!
+
+===== BF16 ACTUAL MMA Tensor Core Attention =====
+  bs=1 nh=4 seq=64 hdim=2048
+CUDA error 1 (invalid argument) at /tmp/tmpobreg5r8/source.cu:279

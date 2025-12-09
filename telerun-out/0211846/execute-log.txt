@@ -1,0 +1,27 @@
+=================================================
+BF16 MMA Tensor Core Attention
+=================================================
+
+===== BF16 MMA Tensor Core Attention =====
+  bs=1 nh=4 seq=64 hdim=512
+Time: 0.152 ms
+Performance: 0.22 TFLOPS
+  Max difference: 1117103813820416.000000 (tolerance 0.150000)
+  Errors: 51795 / 131072
+✗ FAILED
+
+===== BF16 MMA Tensor Core Attention =====
+  bs=1 nh=4 seq=64 hdim=2048
+Time: 0.587 ms
+Performance: 0.23 TFLOPS
+  Max difference: 2302102470656.000000 (tolerance 0.150000)
+  Errors: 201923 / 524288
+✗ FAILED
+
+===== BF16 MMA Tensor Core Attention =====
+  bs=1 nh=2 seq=32 hdim=4096
+Time: 0.592 ms
+Performance: 0.06 TFLOPS
+  Max difference: 1728053248.000000 (tolerance 0.150000)
+  Errors: 114181 / 262144
+✗ FAILED

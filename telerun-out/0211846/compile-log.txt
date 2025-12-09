@@ -1,0 +1,18 @@
+/tmp/tmpwm9dzo_w/source.cu(61): warning #177-D: variable "BLOCK_K_TILE" was declared but never referenced
+      constexpr int BLOCK_K_TILE = 16;
+                    ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+
+/tmp/tmpwm9dzo_w/source.cu(62): warning #177-D: variable "MMA_M" was declared but never referenced
+      constexpr int MMA_M = 16;
+                    ^
+
+/tmp/tmpwm9dzo_w/source.cu(63): warning #177-D: variable "MMA_N" was declared but never referenced
+      constexpr int MMA_N = 8;
+                    ^
+
+/tmp/tmpwm9dzo_w/source.cu(64): warning #177-D: variable "MMA_K" was declared but never referenced
+      constexpr int MMA_K = 16;
+                    ^
+

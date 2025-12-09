@@ -426,6 +426,9 @@ int main() {
     printf("\n*** Testing hdim=8192 ***\n");
     test_attention_large_dims(1, 1, 16, 8192);
 
+    printf("\n*** Testing EXTREME hdim=16384 ***\n");
+    test_attention_large_dims(1, 1, 8, 16384);
+
     printf("\n=================================================\n");
     printf("All tests completed!\n");
     printf("=================================================\n");

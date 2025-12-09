@@ -1,0 +1,41 @@
+=================================================
+BF16 MMA Clean - Multi-warp Parallel
+=================================================
+
+========== BF16 MMA Clean (Multi-warp) ==========
+  bs=1 nh=4 seq=64 hdim=512
+Time: 0.075 ms
+Performance: 0.44 TFLOPS
+  Max difference: 0.125069 (tolerance 0.150000)
+✓ PASSED
+
+========== BF16 MMA Clean (Multi-warp) ==========
+  bs=1 nh=4 seq=64 hdim=2048
+Time: 0.278 ms
+Performance: 0.48 TFLOPS
+  Max difference: 0.128525 (tolerance 0.150000)
+✓ PASSED
+
+========== BF16 MMA Clean (Multi-warp) ==========
+  bs=1 nh=2 seq=32 hdim=4096
+Time: 0.216 ms
+Performance: 0.16 TFLOPS
+  Max difference: 9.245847 (tolerance 0.150000)
+  Errors: 61443 / 262144
+✗ FAILED
+
+========== BF16 MMA Clean (Multi-warp) ==========
+  bs=1 nh=1 seq=16 hdim=8192
+Time: 0.378 ms
+Performance: 0.02 TFLOPS
+  Max difference: 0.196407 (tolerance 0.150000)
+  Errors: 178 / 131072
+✗ FAILED
+
+========== BF16 MMA Clean (Multi-warp) ==========
+  bs=1 nh=1 seq=8 hdim=16384
+Time: 0.739 ms
+Performance: 0.01 TFLOPS
+  Max difference: 0.266147 (tolerance 0.150000)
+  Errors: 1884 / 131072
+✗ FAILED

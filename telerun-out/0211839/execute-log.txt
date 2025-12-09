@@ -1,0 +1,13 @@
+=================================================
+BF16 WMMA Tensor Core Attention Benchmark
+=================================================
+
+*** Testing hdim=512 ***
+
+========================================
+Testing BF16 WMMA Tensor Core Attention:
+  Batch size: 1, Num heads: 4
+  Sequence length: 64, Hidden dim: 512
+========================================
+
+CUDA error 700 (an illegal memory access was encountered) at /tmp/tmpd1qrh5_9/source.cu:434

@@ -1,0 +1,2 @@
+warning: /usr/local/cuda/bin/../targets/x86_64-linux/include/crt/mma.hpp(474): Warning: cannot perform wmma load or store on local memory
+
