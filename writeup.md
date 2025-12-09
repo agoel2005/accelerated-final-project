@@ -190,7 +190,7 @@ In the fused approach:
 
 We were doing **32x more work** to save a single kernel launch and intermediate buffer. Even though both approaches are memory-bound, adding 30x more computation *and* memory traffic doesn't help.
 
-### V3-V6: Failed Rescue Attempts
+### V3-V6: More Optimizations
 
 We tried several approaches to salvage this:
 
@@ -204,11 +204,11 @@ We tried several approaches to salvage this:
 |------|----------------|----------|------------|
 | 2048 | 1.940 ms | 0.230 ms | **8.5x slower** |
 
-The problem? Shared memory limits. With only 48 KB available and needing space for [BLOCK_K x 2048 x 2 bytes], we could only fit 4 K vectors per tile, requiring 16 sequential tile loads with synchronization overhead.
+The problem turned out to be shared memory limits. With only 48 KB available and needing space for [BLOCK_K x 2048 x 2 bytes], we could only fit 4 K vectors per tile, requiring 16 sequential tile loads with synchronization overhead.
 
-**V6 (Dimension tiling):** Tile both the sequence dimension *and* hdim dimension. Better than V5 (3.3x faster), but still 2.5x slower than separate kernels. The O(seq_q x seq_k) redundant computation was fundamental.
+**V6 (Dimension tiling):** Tile both the sequence dimension *and* hdim dimension. Better than V5 (3.3x faster), but still 2.5x slower than separate kernels.
 
-### V7: The Hybrid Solution
+### V7: Partial Fusion?
 
 The winning strategy: fuse only Q rotation, keep K rotation separate.
 
@@ -228,7 +228,7 @@ This "hybrid" approach eliminates the redundant K computation while keeping Q fu
 
 **Why V7 works:**
 
-Q rotation can be fused because each query is processed independently—we rotate Q once when loading it, then use it for all K comparisons. This is O(seq_q) work.
+Q rotation can be fused because each query is processed independently -- we rotate Q once when loading it, then use it for all K comparisons. This is O(seq_q) work.
 
 K rotation cannot be fused because each K vector needs to be compared against all queries. Fusing means rotating K once per query (O(seq_q x seq_k) work), which is 64x more expensive than rotating it once in a separate kernel (O(seq_k) work).
 
@@ -236,23 +236,23 @@ By fusing only Q's rotation, we:
 - Save one kernel launch (no separate Q RoPE kernel)
 - Eliminate one global memory buffer (Q_rope)
 - Improve cache locality (Q loaded once, rotated inline)
-- Avoid O(seq²) redundant computation
+- Avoid O(seq^2) redundant computation
 
-The key insight: **fusion helps when the fused operation is on the outer loop variable (Q), not the inner loop variable (K)**.
+## So Why Did Sinusoidal Work?
 
-## The Key Difference: Sinusoidal vs RoPE
+The answer lies in how the operations interact with the data.
 
-Why did sinusoidal embedding fusion succeed while RoPE fusion failed? The answer reveals a fundamental truth about fusion:
+Sinusoidal embeddings add to each element independently:
 
-**Sinusoidal embeddings add to each element independently:**
 ```cuda
 Q'[i] = Q[i] + sin(pos / 10000^(2i/hdim))  // No dependencies between elements
 ```
 
-**RoPE rotates pairs of elements together:**
+Whereas RoPE rotates pairs of elements together:
+
 ```cuda
-Q'[i] = Q[i] * cos(...) - Q[i+1] * sin(...)    // Couples adjacent elements
-Q'[i+1] = Q[i] * sin(...) + Q[i+1] * cos(...)  // Must compute both together
+Q'[i] = Q[i] * cos(...) - Q[i+1] * sin(...)
+Q'[i+1] = Q[i] * sin(...) + Q[i+1] * cos(...)
 ```
 
 This coupling means:
@@ -267,11 +267,30 @@ For sinusoidal embeddings:
 
 For RoPE:
 - Computing on-the-fly: ~6 FLOPs per element (4 muls + 2 adds + SFU)
-- Loading rotated values: Can't cache them without O(seq²) redundancy
+- Loading rotated values: Can't cache them without O(seq^2) redundancy
 
 The crucial insight: **fusion only helps when you can compute values on-demand without redundancy**. Sinusoidal embeddings depend only on position and dimension index. RoPE depends on the *values* being rotated, so recomputing it means recalculating for every Q-K pair.
 
 For RoPE, the hybrid approach works because Q appears in the outer loop (one rotation per query) while K appears in the inner loop (would require seq_q rotations). Fusing the outer loop variable succeeds; fusing the inner loop variable fails.
+
+## Conclusion
+
+We set out to fuse positional embeddings into attention kernels and achieved 1.4-2.0x speedups for sinusoidal embeddings and 1.4-1.6x for RoPE (via partial fusion).
+
+For sinusoidal embeddings, full fusion succeeded because sin/cos values depend only on position and dimension index -- computing them on-the-fly during the QK dot product costs about the same as loading from memory, and eliminates intermediate buffers.
+
+For RoPE, full fusion failed because it introduced O(seq_q x seq_k) redundant computation -- rotating K once per query instead of once total. The hybrid solution (fuse Q rotation, separate K rotation) achieved speedups by fusing the outer loop variable while keeping the inner loop variable separate.
+
+The broader lesson: **you should only fuse embeddings that don't depend on the input values**. Sinusoidal embeddings are pure functions of position and dimension, but RoPE rotates the actual Q/K values, so fusing it into the attention loop means recomputing rotations for every Q-K pair instead of once per token.
+
+This explains why production frameworks keep positional embeddings as separate preprocessing: for prefill workloads where seq_q and seq_k are approximately equal, any value-dependent embedding like RoPE would introduce O(N^2) redundant rotations. Even sinusoidal embeddings might not be worth fusing if the framework already has optimized separate kernels. Our results suggest sinusoidal fusion could be worthwhile (1.4-2.0x speedup), while RoPE needs the hybrid approach to avoid catastrophic slowdowns.
+
+Future work could explore:
+1. **FP8/INT8 embeddings**: Lower precision positional encodings could reduce memory traffic further on newer GPUs
+2. **Learned positional embeddings**: ALiBi and other learned schemes might have different fusion characteristics
+3. **Decode workloads**: Hybrid RoPE fusion should work better during inference (seq_q=1-4, seq_k=1000s) since Q rotation redundancy is minimal
+
+---
 
 ## Appendix: Benchmarking and Validation
 
@@ -309,81 +328,3 @@ bool passed = (max_diff < 5e-5);  // Tolerance for FP32
 We used **telerun** to execute tests on remote GPU servers with NVIDIA RTX 4000 Ada Generation GPUs (6144 CUDA cores, 26.7 TFLOPS FP32, 360 GB/s bandwidth). All benchmarks reported in this writeup were run on this hardware.
 
 **Correctness Results:** All implementations passing with max error < 5e-5 for FP32.
-
----
-
-## What We Learned
-
-### 1. Memory-Bound Doesn't Mean All Memory is Equal
-
-We started thinking "attention is memory-bound, so reduce memory traffic." But RoPE fusion *increased* memory traffic despite eliminating intermediate buffers, because it caused O(seq²) redundant computation. The lesson: arithmetic intensity is an average—local hotspots can have very different characteristics.
-
-### 2. Fusion Helps When You Can Compute, Not When You Must Recompute
-
-Sinusoidal embeddings: `sin(pos / 10000^(2i/hdim))` depends only on position and index. Compute once per Q-K pair ≈ load once from memory. **Fusion wins.**
-
-RoPE: `x * cos - y * sin` depends on the values x and y. Recomputing for each Q-K pair = 64x redundant work. **Fusion loses.**
-
-The general principle: fuse operations where the computation cost is similar to memory load cost. Don't fuse operations where you'll repeat expensive work.
-
-### 3. Hardware Constraints Are Non-Negotiable
-
-Shared memory: 48 KB. L1 cache: ~128 KB per SM. L2 cache: ~40 MB total. These aren't suggestions—they're walls you'll hit hard. Our attempted optimizations repeatedly crashed into them:
-
-- Multi-query with K/V caching: needed 1 MB, had 48 KB
-- Double buffering: needed 2x space, couldn't fit
-- Full hdim=8192 tiles: needed 512 KB, had 48 KB
-
-FlashAttention's genius isn't just online softmax—it's sizing tiles to fit in the memory hierarchy.
-
-### 4. Simple Optimizations Compound
-
-Our final FP32 kernel used:
-- Online softmax with K/V tiling: +48-102%
-- Float4 vectorization: +10-15%
-- Warp-level reductions: +5-12%
-- Coalesced memory access: +5-10%
-
-None individually groundbreaking, but together: **1.48x-2.02x speedup**. We spent weeks chasing tensor cores (wrong for FP32), multi-query batching (wrong for our memory constraints), and complex register tiling (buggy). The simple stuff worked.
-
-### 5. Profile Before Optimizing (We Didn't, and Paid For It)
-
-We should have run `nsys` and `ncu` profiling on day one:
-```bash
-nsys profile --stats=true ./attention_kernel
-ncu --metrics dram__throughput,l1tex__t_sectors ./attention_kernel
-```
-
-Instead, we guessed. We assumed "memory-bound" meant "try tensor cores" (wrong). We assumed "large hdim" meant "use shared memory caching" (impossible). Profiling would have shown:
-- 4.4% DRAM bandwidth utilization → increase batch size
-- Low SM occupancy → we needed more parallel work
-- Cache hit rates → working set analysis
-
-Measure, don't assume.
-
-## Conclusion
-
-We set out to fuse positional encodings into attention and achieved:
-- **Sinusoidal embeddings:** 1.4-2.0x speedup via full fusion
-- **RoPE:** 1.4-1.7x speedup via hybrid approach (fuse Q only, separate K)
-
-More importantly, we learned that fusion is a tool, not a goal. The question isn't "can we fuse these operations?" but "what is the asymptotic complexity of the fused version?" When RoPE fusion turned O(N) computation into O(N²), no amount of clever GPU programming could save it.
-
-The most valuable lesson: **performance engineering is empirical science**. We formed hypotheses (fusion will help), ran experiments (it didn't always), analyzed the results (arithmetic intensity, memory hierarchy, redundant computation), and updated our mental models. The failed optimizations taught us more than the successful ones.
-
-All code, benchmarks, and detailed logs are available in this repository. The `OPTIMIZATION_LOG.md` contains our full chronological development history—including all the embarrassing dead ends we hit before finding solutions. We hope it saves you some time.
-
-For production use:
-- **Sinusoidal embeddings:** Use `attention_kernel_sinusoidal_fused_v5.cu` (1.4-2.0x faster)
-- **RoPE:** Use hybrid approach `attention_kernel_rope_fused_v7.cu` (1.4-1.7x faster)
-
-Now go profile your code. You might be surprised what you find.
-
----
-
-*Code and benchmarks tested on NVIDIA RTX 4000 Ada Generation via telerun. All implementations validated against PyTorch F.scaled_dot_product_attention with error < 5e-5 for FP32.*
-
----
-
-**References:**
-- [NVIDIA RTX 4000 Ada Generation Specifications](https://www.techpowerup.com/gpu-specs/rtx-4000-ada-generation.c4171)
