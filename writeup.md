@@ -51,7 +51,7 @@ To start, we wrote an optimized attention kernel with similar optimizations to F
 We also wrote a script to compare this performance to PyTorch's implementations of attention. PyTorch required time was as follows:
 
 | Hidden Dim | Optmized Attention | Naive Attention |
-|-----------|------|--------|--------|
+|-----------|------|--------|
 | 512 | 0.032 ms | 0.077 ms | 
 | 2048 | 0.114 ms | 0.219 ms |
 | 4096 | 0.190 ms | 0.412 ms | 
