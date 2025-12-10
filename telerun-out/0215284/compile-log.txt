@@ -1,0 +1,4 @@
+/usr/bin/ld: /tmp/tmpxft_0002d58b_00000000-11_source.o: in function `benchmark_kernel(int, int, int, int, char const*)':
+tmpxft_0002d58b_00000000-6_source.cudafe1.cpp:(.text+0x1f3): undefined reference to `attention_forward_optimized'
+/usr/bin/ld: tmpxft_0002d58b_00000000-6_source.cudafe1.cpp:(.text+0x27b): undefined reference to `attention_forward_optimized'
+collect2: error: ld returned 1 exit status

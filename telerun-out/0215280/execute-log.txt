@@ -1,0 +1,76 @@
+=================================================
+Sinusoidal Hybrid Attention Kernel Tests
+Comparing Hybrid (pre-K + fuse-Q) vs Separate
+=================================================
+
+========================================
+BENCHMARK: Hybrid vs Separate Sinusoidal
+  bs=1, nh=4, seq=64, hdim=512
+========================================
+
+--- Performance Results ---
+  Hybrid (pre-K, fuse-Q):   0.064 ms  [1.03x slower]
+  Separate (baseline):      0.062 ms
+
+Checking hybrid vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+✓ ALL TESTS PASSED
+
+========================================
+BENCHMARK: Hybrid vs Separate Sinusoidal
+  bs=1, nh=4, seq=64, hdim=2048
+========================================
+
+--- Performance Results ---
+  Hybrid (pre-K, fuse-Q):   0.232 ms  [1.07x slower]
+  Separate (baseline):      0.216 ms
+
+Checking hybrid vs CPU...
+  Max difference: 0.000024 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000024 (within tolerance 0.050000)
+
+✓ ALL TESTS PASSED
+
+========================================
+BENCHMARK: Hybrid vs Separate Sinusoidal
+  bs=1, nh=2, seq=32, hdim=4096
+========================================
+
+--- Performance Results ---
+  Hybrid (pre-K, fuse-Q):   0.134 ms  [1.00x FASTER] ✓
+  Separate (baseline):      0.134 ms
+
+Checking hybrid vs CPU...
+  Max difference: 0.000042 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000042 (within tolerance 0.050000)
+
+✓ ALL TESTS PASSED
+
+========================================
+BENCHMARK: Hybrid vs Separate Sinusoidal
+  bs=1, nh=1, seq=16, hdim=8192
+========================================
+
+--- Performance Results ---
+  Hybrid (pre-K, fuse-Q):   0.204 ms  [1.03x slower]
+  Separate (baseline):      0.199 ms
+
+Checking hybrid vs CPU...
+  Max difference: 0.000035 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000035 (within tolerance 0.050000)
+
+✓ ALL TESTS PASSED
+
+=================================================
+Hybrid sinusoidal tests completed!
+=================================================

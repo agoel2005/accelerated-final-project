@@ -78,8 +78,7 @@ __device__ __forceinline__ float block_reduce_sum(float val, float* shared) {
     return val;
 }
 
-// Optimized kernel for large hidden dimensions (2048, 4096, 8192)
-// Uses online softmax and tiling to reduce memory traffic
+// Optimized kernel uses online softmax and tiling to reduce memory traffic
 template<int BLOCK_N>
 __global__ void attention_kernel(
     const float* __restrict__ Q,
@@ -127,8 +126,7 @@ __global__ void attention_kernel(
                 for (int d = 0; d < hdim; d += 4) {
                     float4 q_vec = *reinterpret_cast<const float4*>(&Q[q_offset + d]);
                     float4 k_vec = *reinterpret_cast<const float4*>(&K[k_offset + d]);
-                    score += q_vec.x * k_vec.x + q_vec.y * k_vec.y +
-                             q_vec.z * k_vec.z + q_vec.w * k_vec.w;
+                    score += q_vec.x * k_vec.x + q_vec.y * k_vec.y + q_vec.z * k_vec.z + q_vec.w * k_vec.w;
                 }
             } 
             else {

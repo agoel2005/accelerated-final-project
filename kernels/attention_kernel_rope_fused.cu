@@ -1307,18 +1307,23 @@ __global__ void attention_fwd_kernel_no_rope(
 
     const int q_offset = qkv_base + q_idx * hdim;
 
+    //running stats
     float m_max = -INFINITY;
     float l_sum = 0.0f;
 
+    // online softmax chunks K/V into blocks
     for (int k_start = 0; k_start < seq_k; k_start += BLOCK_N) {
         const int k_end = min(k_start + BLOCK_N, seq_k);
         const int num_k = k_end - k_start;
 
+        // Compute scores for this block
         for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
             int k_idx = k_start + k_local;
             int k_offset = kv_base + k_idx * hdim;
+
             float score = 0.0f;
 
+            // Vectorized dot product
             if (hdim % 4 == 0) {
                 for (int d = 0; d < hdim; d += 4) {
                     float4 q_vec = *reinterpret_cast<const float4*>(&Q[q_offset + d]);
@@ -1326,7 +1331,8 @@ __global__ void attention_fwd_kernel_no_rope(
                     score += q_vec.x * k_vec.x + q_vec.y * k_vec.y +
                              q_vec.z * k_vec.z + q_vec.w * k_vec.w;
                 }
-            } else {
+            } 
+            else {
                 for (int d = 0; d < hdim; d++) {
                     score += Q[q_offset + d] * K[k_offset + d];
                 }
@@ -1337,15 +1343,18 @@ __global__ void attention_fwd_kernel_no_rope(
         }
         __syncthreads();
 
+        // block max
         float block_max = -INFINITY;
         for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
             block_max = fmaxf(block_max, s_scores[k_local]);
         }
         block_max = block_reduce_max(block_max, s_reduce);
 
+        // Update global max
         float m_new = fmaxf(m_max, block_max);
         float correction = expf(m_max - m_new);
 
+        // Compute exp and sum
         float block_sum = 0.0f;
         for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
             float exp_val = expf(s_scores[k_local] - m_new);
@@ -1354,8 +1363,10 @@ __global__ void attention_fwd_kernel_no_rope(
         }
         block_sum = block_reduce_sum(block_sum, s_reduce);
 
+        // Update running sum
         l_sum = correction * l_sum + block_sum;
 
+        // Update output with correction factor
         for (int d = tid; d < hdim; d += blockDim.x) {
             float prev_out = (k_start > 0) ? out[q_offset + d] : 0.0f;
             float corrected_out = prev_out * correction;
@@ -1374,10 +1385,12 @@ __global__ void attention_fwd_kernel_no_rope(
         __syncthreads();
     }
 
+    // Final normalization
     for (int d = tid; d < hdim; d += blockDim.x) {
         out[q_offset + d] /= l_sum;
     }
 }
+
 
 void attention_forward_separate_rope(
     const float* Q,
@@ -1834,7 +1847,12 @@ void benchmark_fused_vs_separate(int bs, int nh, int seqlen, int hdim, int rotar
     CUDA_CHECK(cudaEventCreate(&stop));
     const int num_iters = 20;
 
-    attention_forward_rope_fused_v6(d_Q, d_K, d_V, d_out, bs, nh, seqlen, seqlen, hdim, rotary_dim);
+    // V6 requires too much shared memory for large hdim, skip if hdim >= 2048
+    bool test_v6 = (hdim < 2048);
+
+    if (test_v6) {
+        attention_forward_rope_fused_v6(d_Q, d_K, d_V, d_out, bs, nh, seqlen, seqlen, hdim, rotary_dim);
+    }
     attention_forward_separate_rope(d_Q, d_K, d_V, d_Q_rope, d_K_rope, d_out, d_cos, d_sin, bs, nh, seqlen, seqlen, hdim, rotary_dim);
 
     int total_k = bs * nh * seqlen;
@@ -1842,15 +1860,17 @@ void benchmark_fused_vs_separate(int bs, int nh, int seqlen, int hdim, int rotar
     attention_forward_rope_fused_v7_hybrid(d_Q, d_K_rope, d_V, d_out, bs, nh, seqlen, seqlen, hdim, rotary_dim);
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    CUDA_CHECK(cudaEventRecord(start));
-    for (int i = 0; i < num_iters; i++) {
-        attention_forward_rope_fused_v6(d_Q, d_K, d_V, d_out, bs, nh, seqlen, seqlen, hdim, rotary_dim);
-    }
-    CUDA_CHECK(cudaEventRecord(stop));
-    CUDA_CHECK(cudaEventSynchronize(stop));
     float fused_v6_ms = 0;
-    CUDA_CHECK(cudaEventElapsedTime(&fused_v6_ms, start, stop));
-    fused_v6_ms /= num_iters;
+    if (test_v6) {
+        CUDA_CHECK(cudaEventRecord(start));
+        for (int i = 0; i < num_iters; i++) {
+            attention_forward_rope_fused_v6(d_Q, d_K, d_V, d_out, bs, nh, seqlen, seqlen, hdim, rotary_dim);
+        }
+        CUDA_CHECK(cudaEventRecord(stop));
+        CUDA_CHECK(cudaEventSynchronize(stop));
+        CUDA_CHECK(cudaEventElapsedTime(&fused_v6_ms, start, stop));
+        fused_v6_ms /= num_iters;
+    }
 
     CUDA_CHECK(cudaEventRecord(start));
     for (int i = 0; i < num_iters; i++) {
@@ -1875,11 +1895,15 @@ void benchmark_fused_vs_separate(int bs, int nh, int seqlen, int hdim, int rotar
     CUDA_CHECK(cudaEventElapsedTime(&separate_ms, start, stop));
     separate_ms /= num_iters;
 
-    printf("\n  V6 (full fusion):         %.3f ms", fused_v6_ms);
-    if (fused_v6_ms < separate_ms) {
-        printf("  [%.2fx FASTER] ✓\n", separate_ms / fused_v6_ms);
+    if (test_v6) {
+        printf("\n  V6 (full fusion):         %.3f ms", fused_v6_ms);
+        if (fused_v6_ms < separate_ms) {
+            printf("  [%.2fx FASTER] ✓\n", separate_ms / fused_v6_ms);
+        } else {
+            printf("  [%.2fx slower]\n", fused_v6_ms / separate_ms);
+        }
     } else {
-        printf("  [%.2fx slower]\n", fused_v6_ms / separate_ms);
+        printf("\n  V6 (full fusion):         SKIPPED (shared memory limit exceeded for hdim=%d)\n", hdim);
     }
 
     printf("  V7 (hybrid):              %.3f ms", hybrid_v7_ms);
@@ -1920,16 +1944,22 @@ int main() {
     printf("\n--- TARGET DIMENSION TESTS ---\n");
     test_rope_attention(1, 4, 64, 512);
     test_rope_attention(1, 4, 64, 2048);
+    test_rope_attention(1, 2, 32, 4096);
+    test_rope_attention(1, 1, 16, 8192);
 
     printf("\n--- FUSED vs SEPARATE BENCHMARK (PARTIAL ROTATION) ---\n");
     printf("Testing realistic LLaMA-style configs:\n");
     printf("  hdim=128, rotary_dim=64   (50%% rotation)\n");
     printf("  hdim=512, rotary_dim=128  (25%% rotation)\n");
-    printf("  hdim=2048, rotary_dim=128 (6%% rotation)\n\n");
+    printf("  hdim=2048, rotary_dim=128 (6%% rotation)\n");
+    printf("  hdim=4096, rotary_dim=128 (3%% rotation)\n");
+    printf("  hdim=8192, rotary_dim=128 (1.5%% rotation)\n\n");
 
     benchmark_fused_vs_separate(1, 4, 64, 128, 64);
     benchmark_fused_vs_separate(1, 4, 64, 512, 128);
     benchmark_fused_vs_separate(1, 4, 64, 2048, 128);
+    benchmark_fused_vs_separate(1, 2, 32, 4096, 128);
+    benchmark_fused_vs_separate(1, 1, 16, 8192, 128);
 
     printf("\n=================================================\n");
     printf("All tests completed!\n");

@@ -97,6 +97,161 @@ __device__ __forceinline__ float rope_freq(int pair_idx, int hdim, float base = 
     return 1.0f / powf(base, (2.0f * pair_idx) / hdim);
 }
 
+
+
+template<int BLOCK_K>
+__global__ void attention_fwd_kernel_rope_fused_v7_hybrid(
+    const float* __restrict__ Q,
+    const float* __restrict__ K_rotated,
+    const float* __restrict__ V,
+    float* __restrict__ out,
+    int bs, int nh, int seq_q, int seq_k, int hdim, int rotary_dim,
+    float scale_factor
+) {
+    const int batch_head_idx = blockIdx.y;
+    const int b_idx = batch_head_idx / nh;
+    const int h_idx = batch_head_idx % nh;
+    const int q_idx = blockIdx.x;
+
+    if (q_idx >= seq_q) return;
+
+    const int tid = threadIdx.x;
+    const int qkv_base = (b_idx * nh + h_idx) * seq_q * hdim;
+    const int kv_base = (b_idx * nh + h_idx) * seq_k * hdim;
+
+    extern __shared__ float smem[];
+    float* s_scores = smem;
+    float* s_reduce = s_scores + BLOCK_K;
+    float* s_Q_rope = s_reduce + 32;
+    float* s_freq = s_Q_rope + hdim;
+
+    const int q_offset = qkv_base + q_idx * hdim;
+    const int q_pos = q_idx;
+
+    // Precompute freq
+    for (int i = tid; i < rotary_dim/2; i += blockDim.x) {
+        s_freq[i] = 1.0f / powf(10000.0f, (2.0f * i) / rotary_dim);
+    }
+    __syncthreads();
+
+    // Apply RoPE to Q
+    for (int d = tid * 2; d < rotary_dim; d += blockDim.x * 2) {
+        int pair_idx = d / 2;
+        float theta = q_pos * s_freq[pair_idx];
+        float cos_val, sin_val;
+        __sincosf(theta, &sin_val, &cos_val);
+
+        float q_even = Q[q_offset + d];
+        float q_odd  = Q[q_offset + d + 1];
+
+        s_Q_rope[d]     = q_even * cos_val - q_odd * sin_val;
+        s_Q_rope[d + 1] = q_even * sin_val + q_odd * cos_val;
+    }
+
+    // Copy non-rotated dimensions 
+    for (int d = rotary_dim + tid; d < hdim; d += blockDim.x) {
+        s_Q_rope[d] = Q[q_offset + d];
+    }
+    __syncthreads();
+
+    float m_max = -INFINITY;
+    float l_sum = 0.0f;
+
+    for (int k_start = 0; k_start < seq_k; k_start += BLOCK_K) {
+        const int k_end = min(k_start + BLOCK_K, seq_k);
+        const int num_k = k_end - k_start;
+
+        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
+            int k_idx = k_start + k_local;
+            int k_offset = kv_base + k_idx * hdim;
+
+            float score = 0.0f;
+
+            for (int d = 0; d < hdim; d += 4) {
+                if (d + 3 < hdim) {
+                    float4 q_vec = *reinterpret_cast<const float4*>(&s_Q_rope[d]);
+                    float4 k_vec = *reinterpret_cast<const float4*>(&K_rotated[k_offset + d]);
+                    score += q_vec.x * k_vec.x + q_vec.y * k_vec.y + q_vec.z * k_vec.z + q_vec.w * k_vec.w;
+                } 
+                else {
+                    for (int dd = d; dd < hdim; dd++) {
+                        score += s_Q_rope[dd] * K_rotated[k_offset + dd];
+                    }
+                    break;
+                }
+            }
+
+            s_scores[k_local] = score * scale_factor;
+        }
+        __syncthreads();
+
+        float block_max = -INFINITY;
+        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
+            block_max = fmaxf(block_max, s_scores[k_local]);
+        }
+
+        block_max = block_reduce_max(block_max, s_reduce);
+
+        float m_new = fmaxf(m_max, block_max);
+        float correction = expf(m_max - m_new);
+
+        float block_sum = 0.0f;
+        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
+            float exp_val = expf(s_scores[k_local] - m_new);
+            s_scores[k_local] = exp_val;
+            block_sum += exp_val;
+        }
+        block_sum = block_reduce_sum(block_sum, s_reduce);
+
+        l_sum = correction * l_sum + block_sum;
+
+        for (int d = tid; d < hdim; d += blockDim.x) {
+            float prev_out = (k_start > 0) ? out[q_offset + d] : 0.0f;
+            float corrected_out = prev_out * correction;
+
+            float v_acc = 0.0f;
+            for (int k_local = 0; k_local < num_k; k_local++) {
+                int k_idx = k_start + k_local;
+                v_acc += s_scores[k_local] * V[kv_base + k_idx * hdim + d];
+            }
+
+            out[q_offset + d] = corrected_out + v_acc;
+        }
+
+        m_max = m_new;
+        __syncthreads();
+    }
+
+    for (int d = tid; d < hdim; d += blockDim.x) {
+        out[q_offset + d] /= l_sum;
+    }
+}
+
+void attention_forward_rope_fused_v7_hybrid(
+    const float* Q, const float* K_rotated, const float* V, float* out,
+    int batch_sz, int num_heads, int len_q, int len_k, int head_d, int rotary_dim
+) {
+    float scale = 1.0f / sqrtf(static_cast<float>(head_d));
+    dim3 grid(len_q, batch_sz * num_heads);
+    const int nthreads = 256;
+
+    constexpr int BLOCK_K = 64;
+    const int shmem_sz = (BLOCK_K + 32 + head_d + rotary_dim/2) * sizeof(float);
+
+    attention_fwd_kernel_rope_fused_v7_hybrid<BLOCK_K><<<grid, nthreads, shmem_sz>>>(
+        Q, K_rotated, V, out, batch_sz, num_heads, len_q, len_k, head_d, rotary_dim, scale
+    );
+
+    CUDA_CHECK(cudaGetLastError());
+    CUDA_CHECK(cudaDeviceSynchronize());
+}
+
+
+
+//------------------------------------------------------------------------------------------------------------------------
+//OLD VERSIONS
+
+
 template<int BLOCK_N>
 __global__ void attention_fwd_kernel_rope_fused_v2(
     const float* __restrict__ Q,
@@ -826,8 +981,7 @@ __global__ void attention_fwd_kernel_rope_fused_v6(
                         k_val_1 = k_odd;
                     }
 
-                    partial_score += s_Q_rope[d_global] * k_val_0 +
-                                   s_Q_rope[d_global + 1] * k_val_1;
+                    partial_score += s_Q_rope[d_global] * k_val_0 + s_Q_rope[d_global + 1] * k_val_1;
                 }
 
                 s_scores[k_local] += partial_score;
@@ -895,161 +1049,6 @@ void attention_forward_rope_fused_v6(
 
     attention_fwd_kernel_rope_fused_v6<BLOCK_K, TILE_D><<<grid, nthreads, shmem_sz>>>(
         Q, K, V, out, batch_sz, num_heads, len_q, len_k, head_d, rotary_dim, scale
-    );
-
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
-}
-
-template<int BLOCK_K>
-__global__ void attention_fwd_kernel_rope_fused_v7_hybrid(
-    const float* __restrict__ Q,
-    const float* __restrict__ K_rotated,
-    const float* __restrict__ V,
-    float* __restrict__ out,
-    int bs, int nh, int seq_q, int seq_k, int hdim, int rotary_dim,
-    float scale_factor
-) {
-    const int batch_head_idx = blockIdx.y;
-    const int b_idx = batch_head_idx / nh;
-    const int h_idx = batch_head_idx % nh;
-    const int q_idx = blockIdx.x;
-
-    if (q_idx >= seq_q) return;
-
-    const int tid = threadIdx.x;
-    const int qkv_base = (b_idx * nh + h_idx) * seq_q * hdim;
-    const int kv_base = (b_idx * nh + h_idx) * seq_k * hdim;
-
-    extern __shared__ float smem[];
-    float* s_scores = smem;
-    float* s_reduce = s_scores + BLOCK_K;
-    float* s_Q_rope = s_reduce + 32;
-    float* s_freq = s_Q_rope + hdim;
-
-    const int q_offset = qkv_base + q_idx * hdim;
-    const int q_pos = q_idx;
-
-    // Precompute freq[i] = 1 / (10000^(2i/rotary_dim)) and cache in shmem
-    for (int i = tid; i < rotary_dim/2; i += blockDim.x) {
-        s_freq[i] = 1.0f / powf(10000.0f, (2.0f * i) / rotary_dim);
-    }
-    __syncthreads();
-
-    // Apply RoPE to Q and store in shmem
-    // Process pairs (d,d+1) together
-    for (int d = tid * 2; d < rotary_dim; d += blockDim.x * 2) {
-        int pair_idx = d / 2;
-        float theta = q_pos * s_freq[pair_idx];
-        float cos_val, sin_val;
-        __sincosf(theta, &sin_val, &cos_val);
-
-        float q_even = Q[q_offset + d];
-        float q_odd  = Q[q_offset + d + 1];
-
-        s_Q_rope[d]     = q_even * cos_val - q_odd * sin_val;
-        s_Q_rope[d + 1] = q_even * sin_val + q_odd * cos_val;
-    }
-
-    // Copy non-rotated dimensions to shmem (partial rotation)
-    for (int d = rotary_dim + tid; d < hdim; d += blockDim.x) {
-        s_Q_rope[d] = Q[q_offset + d];
-    }
-    __syncthreads();
-
-    // Flash attn softmax
-    float m_max = -INFINITY;
-    float l_sum = 0.0f;
-
-    // Process K in tiles of BLOCK_K
-    for (int k_start = 0; k_start < seq_k; k_start += BLOCK_K) {
-        const int k_end = min(k_start + BLOCK_K, seq_k);
-        const int num_k = k_end - k_start;
-
-        // Attn scores: Q_rope x K_rotated
-        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
-            int k_idx = k_start + k_local;
-            int k_offset = kv_base + k_idx * hdim;
-
-            float score = 0.0f;
-
-            // Dot prod with float4
-            for (int d = 0; d < hdim; d += 4) {
-                if (d + 3 < hdim) {
-                    float4 q_vec = *reinterpret_cast<const float4*>(&s_Q_rope[d]);
-                    float4 k_vec = *reinterpret_cast<const float4*>(&K_rotated[k_offset + d]);
-                    score += q_vec.x * k_vec.x + q_vec.y * k_vec.y +
-                             q_vec.z * k_vec.z + q_vec.w * k_vec.w;
-                } else {
-                    for (int dd = d; dd < hdim; dd++) {
-                        score += s_Q_rope[dd] * K_rotated[k_offset + dd];
-                    }
-                    break;
-                }
-            }
-
-            s_scores[k_local] = score * scale_factor;
-        }
-        __syncthreads();
-
-        // Online softmax
-        float block_max = -INFINITY;
-        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
-            block_max = fmaxf(block_max, s_scores[k_local]);
-        }
-
-        // Reduce max across threads
-        block_max = block_reduce_max(block_max, s_reduce);
-
-        float m_new = fmaxf(m_max, block_max);
-        float correction = expf(m_max - m_new);
-
-        float block_sum = 0.0f;
-        for (int k_local = tid; k_local < num_k; k_local += blockDim.x) {
-            float exp_val = expf(s_scores[k_local] - m_new);
-            s_scores[k_local] = exp_val;
-            block_sum += exp_val;
-        }
-        block_sum = block_reduce_sum(block_sum, s_reduce);
-
-        l_sum = correction * l_sum + block_sum;
-
-        for (int d = tid; d < hdim; d += blockDim.x) {
-            float prev_out = (k_start > 0) ? out[q_offset + d] : 0.0f;
-            float corrected_out = prev_out * correction;
-
-            float v_acc = 0.0f;
-            for (int k_local = 0; k_local < num_k; k_local++) {
-                int k_idx = k_start + k_local;
-                v_acc += s_scores[k_local] * V[kv_base + k_idx * hdim + d];
-            }
-
-            out[q_offset + d] = corrected_out + v_acc;
-        }
-
-        m_max = m_new;
-        __syncthreads();
-    }
-
-    // Normalize
-    for (int d = tid; d < hdim; d += blockDim.x) {
-        out[q_offset + d] /= l_sum;
-    }
-}
-
-void attention_forward_rope_fused_v7_hybrid(
-    const float* Q, const float* K_rotated, const float* V, float* out,
-    int batch_sz, int num_heads, int len_q, int len_k, int head_d, int rotary_dim
-) {
-    float scale = 1.0f / sqrtf(static_cast<float>(head_d));
-    dim3 grid(len_q, batch_sz * num_heads);
-    const int nthreads = 256;
-
-    constexpr int BLOCK_K = 64;
-    const int shmem_sz = (BLOCK_K + 32 + head_d + rotary_dim/2) * sizeof(float);
-
-    attention_fwd_kernel_rope_fused_v7_hybrid<BLOCK_K><<<grid, nthreads, shmem_sz>>>(
-        Q, K_rotated, V, out, batch_sz, num_heads, len_q, len_k, head_d, rotary_dim, scale
     );
 
     CUDA_CHECK(cudaGetLastError());
@@ -1146,8 +1145,7 @@ __global__ void attention_fwd_kernel_rope_fused(
                     float k2_rope = k_vec.z * cos_vec.z - k_vec.w * sin_vec.z;
                     float k3_rope = k_vec.z * sin_vec.z + k_vec.w * cos_vec.z;
 
-                    score += q_vec.x * k0_rope + q_vec.y * k1_rope +
-                             q_vec.z * k2_rope + q_vec.w * k3_rope;
+                    score += q_vec.x * k0_rope + q_vec.y * k1_rope + q_vec.z * k2_rope + q_vec.w * k3_rope;
                 }
             } else {
                 for (int d = 0; d < hdim; d += 2) {
@@ -1323,8 +1321,7 @@ __global__ void attention_fwd_kernel_no_rope(
                 for (int d = 0; d < hdim; d += 4) {
                     float4 q_vec = *reinterpret_cast<const float4*>(&Q[q_offset + d]);
                     float4 k_vec = *reinterpret_cast<const float4*>(&K[k_offset + d]);
-                    score += q_vec.x * k_vec.x + q_vec.y * k_vec.y +
-                             q_vec.z * k_vec.z + q_vec.w * k_vec.w;
+                    score += q_vec.x * k_vec.x + q_vec.y * k_vec.y + q_vec.z * k_vec.z + q_vec.w * k_vec.w;
                 }
             } else {
                 for (int d = 0; d < hdim; d++) {
@@ -1500,6 +1497,15 @@ void attention_rope_cpu(
         }
     }
 }
+
+
+
+
+//-------------------------------------------------------------------------------------------------------------------------
+
+//CODE FOR TESTING
+
+
 
 void init_random(float* data, int size, float min_val = -1.0f, float max_val = 1.0f) {
     for (int i = 0; i < size; i++) {

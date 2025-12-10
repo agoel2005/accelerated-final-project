@@ -1,0 +1,6 @@
+/tmp/tmpr_vk8ovg/source.cu(1256): warning #177-D: variable "pos" was declared but never referenced
+      int pos = token_idx % (total_tokens / gridDim.x * gridDim.x == total_tokens ?
+          ^
+
+Remark: The warnings can be suppressed with "-diag-suppress <warning-number>"
+

@@ -1,0 +1,80 @@
+=================================================
+Sinusoidal Hybrid V2 Attention Tests
+V2: Pre-compute K, compute Q on-the-fly
+=================================================
+
+========================================
+BENCHMARK: Hybrid V2 vs Separate
+  bs=1, nh=4, seq=64, hdim=512
+========================================
+
+--- Performance Results ---
+  Hybrid V2 (on-the-fly Q): 0.070 ms  [1.11x slower]
+  Separate (baseline):      0.063 ms
+  Slowdown: -10.6%
+
+Checking hybrid vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+✓ ALL TESTS PASSED
+
+========================================
+BENCHMARK: Hybrid V2 vs Separate
+  bs=1, nh=4, seq=64, hdim=2048
+========================================
+
+--- Performance Results ---
+  Hybrid V2 (on-the-fly Q): 0.256 ms  [1.18x slower]
+  Separate (baseline):      0.216 ms
+  Slowdown: -18.2%
+
+Checking hybrid vs CPU...
+  Max difference: 0.000024 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000024 (within tolerance 0.050000)
+
+✓ ALL TESTS PASSED
+
+========================================
+BENCHMARK: Hybrid V2 vs Separate
+  bs=1, nh=2, seq=32, hdim=4096
+========================================
+
+--- Performance Results ---
+  Hybrid V2 (on-the-fly Q): 0.177 ms  [1.32x slower]
+  Separate (baseline):      0.134 ms
+  Slowdown: -31.9%
+
+Checking hybrid vs CPU...
+  Max difference: 0.000042 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000042 (within tolerance 0.050000)
+
+✓ ALL TESTS PASSED
+
+========================================
+BENCHMARK: Hybrid V2 vs Separate
+  bs=1, nh=1, seq=16, hdim=8192
+========================================
+
+--- Performance Results ---
+  Hybrid V2 (on-the-fly Q): 0.290 ms  [1.45x slower]
+  Separate (baseline):      0.199 ms
+  Slowdown: -45.3%
+
+Checking hybrid vs CPU...
+  Max difference: 0.000035 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000035 (within tolerance 0.050000)
+
+✓ ALL TESTS PASSED
+
+=================================================
+All tests completed!
+=================================================

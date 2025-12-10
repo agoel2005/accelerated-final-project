@@ -158,8 +158,7 @@ __global__ void attention_fwd_kernel_sinusoidal_fused_v5(
                     float q_emb_3 = q_vec.w + cos_q3;
                     float k_emb_3 = k_vec.w + cos_k3;
 
-                    score += q_emb_0 * k_emb_0 + q_emb_1 * k_emb_1 +
-                             q_emb_2 * k_emb_2 + q_emb_3 * k_emb_3;
+                    score += q_emb_0 * k_emb_0 + q_emb_1 * k_emb_1 + q_emb_2 * k_emb_2 + q_emb_3 * k_emb_3;
                 }
             } 
             
