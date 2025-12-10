@@ -48,7 +48,7 @@ To start, we wrote an optimized attention kernel with similar optimizations to F
 | 4096 | 0.126 ms | 4.26 | Best |
 | 8192 | 0.194 ms | 0.69 | Struggling |
 
-We also wrote a script to compare this performance to PyTorch's implementations of attention. PyTorch required time was as follows:
+We also wrote a script to compare this performance to PyTorch's implementations of attention (both via the optimized F.scaled_dot_product_attention function and by manually performing the operations of attention ourselves). PyTorch required time was as follows:
 
 | Hidden Dim | Optmized Attention | Naive Attention |
 |-----------|------|--------|
@@ -313,7 +313,7 @@ Our base attention kernel was a little slower than PyTorch's built-in optimized 
 We only tested two embedding types, sinusoidal and RopE. Two big classes of embeddings that we didn't test were learned embeddings (which seem quite difficult to build out-of-the-box fusions for) and hierarchical embeddings. 
 
 
-### Directions for Future Work
+## Directions for Future Work
 
 
 **1.Tensor Core and Mixed Precision**
