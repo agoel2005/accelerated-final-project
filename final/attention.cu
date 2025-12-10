@@ -284,7 +284,7 @@ void attention_cpu(
 
 //---------------------------------------------------------------------------------------------------------------------
 
-//FUNCTIONS FOR TESTING AND ENSURING THAT THE KERNELS WORK CORRECTLY (written using AI)
+//FUNCTIONS FOR TESTING AND ENSURING THAT THE KERNELS WORK CORRECTLY
 
 
 void init_random(float* data, int size, float min_val = -1.0f, float max_val = 1.0f) {
