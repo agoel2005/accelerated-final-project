@@ -1,0 +1,9 @@
+/tmp/tmp1zb1_ybz/source.cu(356): error: identifier "attention_forward" is undefined
+      attention_forward(d_Q, d_K, d_V, d_out, bs, nh, seqlen, seqlen, hdim);
+      ^
+
+/tmp/tmp1zb1_ybz/source.cu(464): error: identifier "attention_forward" is undefined
+      attention_forward(d_Q, d_K, d_V, d_out, bs, nh, seqlen_q, seqlen_kv, hdim);
+      ^
+
+2 errors detected in the compilation of "/tmp/tmp1zb1_ybz/source.cu".

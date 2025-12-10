@@ -1,0 +1,306 @@
+=================================================
+CUDA Attention Kernel Test Suite
+=================================================
+
+--- BASIC CORRECTNESS TESTS ---
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 4
+  Head dimension: 8
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.026 ms
+
+Checking optimized results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 8
+  Head dimension: 16
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.010 ms
+
+Checking optimized results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 2
+  Num heads: 4
+  Sequence length: 32
+  Head dimension: 32
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.013 ms
+
+Checking optimized results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 2
+  Num heads: 8
+  Sequence length: 64
+  Head dimension: 64
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.037 ms
+
+Checking optimized results vs CPU...
+  Mismatch at index 32: GPU=0.092673, CPU=0.041522, diff=0.051151
+  Mismatch at index 33: GPU=0.094975, CPU=0.037169, diff=0.057806
+  Mismatch at index 39: GPU=0.196167, CPU=0.117065, diff=0.079102
+  Mismatch at index 40: GPU=-0.166744, CPU=-0.098080, diff=0.068664
+  Mismatch at index 42: GPU=0.132464, CPU=0.068909, diff=0.063555
+  Mismatch at index 44: GPU=0.197240, CPU=0.113784, diff=0.083457
+  Mismatch at index 47: GPU=0.153402, CPU=0.093327, diff=0.060075
+  Mismatch at index 48: GPU=-0.184078, CPU=-0.096915, diff=0.087164
+  Mismatch at index 50: GPU=0.139015, CPU=0.085337, diff=0.053678
+  Mismatch at index 51: GPU=-0.198795, CPU=-0.101614, diff=0.097181
+  Total mismatches: 16182 / 65536
+  Max difference: 0.317828
+
+✗ TEST FAILED
+
+========================================
+Testing cross-attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Query sequence length: 16
+  Key/Value sequence length: 32
+  Head dimension: 32
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+Checking results...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+--- SMALL HEAD DIMENSION TESTS ---
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 16
+  Head dimension: 64
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.009 ms
+
+Checking optimized results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 2
+  Num heads: 8
+  Sequence length: 64
+  Head dimension: 128
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.050 ms
+
+Checking optimized results vs CPU...
+  Mismatch at index 35: GPU=0.203841, CPU=0.090691, diff=0.113150
+  Mismatch at index 36: GPU=-0.335456, CPU=-0.169162, diff=0.166294
+  Mismatch at index 37: GPU=0.156991, CPU=0.090203, diff=0.066788
+  Mismatch at index 38: GPU=0.178182, CPU=0.088626, diff=0.089556
+  Mismatch at index 41: GPU=0.136505, CPU=0.059296, diff=0.077210
+  Mismatch at index 43: GPU=-0.235975, CPU=-0.116972, diff=0.119002
+  Mismatch at index 44: GPU=0.204488, CPU=0.105881, diff=0.098607
+  Mismatch at index 47: GPU=0.219697, CPU=0.108038, diff=0.111659
+  Mismatch at index 50: GPU=0.245256, CPU=0.123766, diff=0.121489
+  Mismatch at index 51: GPU=0.300027, CPU=0.156410, diff=0.143617
+  Total mismatches: 16137 / 131072
+  Max difference: 0.272253
+
+✗ TEST FAILED
+
+--- LARGE HEAD DIMENSION TESTS (TARGET) ---
+
+*** Testing hdim=512 (warmup for large dims) ***
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 512
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.059 ms
+
+Checking optimized results vs CPU...
+  Mismatch at index 32: GPU=-0.251380, CPU=-0.124284, diff=0.127096
+  Mismatch at index 35: GPU=-0.142494, CPU=-0.070450, diff=0.072044
+  Mismatch at index 36: GPU=0.326850, CPU=0.161597, diff=0.165253
+  Mismatch at index 39: GPU=-0.125951, CPU=-0.062271, diff=0.063680
+  Mismatch at index 40: GPU=0.113492, CPU=0.056111, diff=0.057381
+  Mismatch at index 41: GPU=0.098980, CPU=0.048937, diff=0.050044
+  Mismatch at index 42: GPU=-0.422405, CPU=-0.208840, diff=0.213565
+  Mismatch at index 43: GPU=0.287067, CPU=0.141928, diff=0.145139
+  Mismatch at index 48: GPU=0.171613, CPU=0.084847, diff=0.086766
+  Mismatch at index 49: GPU=-0.124919, CPU=-0.061761, diff=0.063158
+  Total mismatches: 8037 / 131072
+  Max difference: 0.291695
+
+✗ TEST FAILED
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 2048
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.214 ms
+
+Checking optimized results vs CPU...
+  Mismatch at index 34: GPU=0.117852, CPU=0.061017, diff=0.056835
+  Mismatch at index 35: GPU=0.140527, CPU=0.072757, diff=0.067770
+  Mismatch at index 36: GPU=0.203104, CPU=0.105156, diff=0.097949
+  Mismatch at index 37: GPU=0.305085, CPU=0.157956, diff=0.147130
+  Mismatch at index 42: GPU=-0.130419, CPU=-0.067523, diff=0.062896
+  Mismatch at index 43: GPU=-0.145487, CPU=-0.075325, diff=0.070162
+  Mismatch at index 45: GPU=-0.123532, CPU=-0.063957, diff=0.059574
+  Mismatch at index 46: GPU=0.189097, CPU=0.097903, diff=0.091193
+  Mismatch at index 50: GPU=0.135429, CPU=0.070117, diff=0.065312
+  Mismatch at index 52: GPU=-0.184874, CPU=-0.095717, diff=0.089157
+  Total mismatches: 29711 / 524288
+  Max difference: 0.287052
+
+✗ TEST FAILED
+
+*** Testing hdim=4096 ***
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 32
+  Head dimension: 4096
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.125 ms
+
+Checking optimized results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+*** Testing hdim=8192 ***
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 16
+  Head dimension: 8192
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.192 ms
+
+Checking optimized results vs CPU...
+  Max difference: 0.000000 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+--- REALISTIC WORKLOAD BENCHMARKS ---
+
+*** LLaMA-style config: bs=4, nh=32, seq=512, hdim=128 ***
+
+========================================
+Testing attention kernel:
+  Batch size: 4
+  Num heads: 32
+  Sequence length: 512
+  Head dimension: 128
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 21.260 ms
+
+Checking optimized results vs CPU...
+  Mismatch at index 49: GPU=-0.153478, CPU=-0.080288, diff=0.073190
+  Mismatch at index 177: GPU=-0.115796, CPU=-0.060676, diff=0.055119
+  Mismatch at index 305: GPU=-0.153683, CPU=-0.080532, diff=0.073151
+  Mismatch at index 433: GPU=-0.142329, CPU=-0.072710, diff=0.069619
+  Mismatch at index 561: GPU=-0.183440, CPU=-0.093978, diff=0.089462
+  Mismatch at index 689: GPU=-0.141500, CPU=-0.073535, diff=0.067966
+  Mismatch at index 701: GPU=0.109454, CPU=0.056881, diff=0.052573
+  Mismatch at index 804: GPU=-0.101330, CPU=-0.050476, diff=0.050854
+  Mismatch at index 817: GPU=-0.132074, CPU=-0.069137, diff=0.062937
+  Mismatch at index 945: GPU=-0.153935, CPU=-0.079405, diff=0.074530
+  Total mismatches: 103226 / 8388608
+  Max difference: 0.114068
+
+✗ TEST FAILED
+
+=================================================
+All tests completed!
+=================================================

@@ -1,0 +1,263 @@
+=================================================
+CUDA Attention Kernel Test Suite
+=================================================
+
+--- BASIC CORRECTNESS TESTS ---
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 4
+  Head dimension: 8
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.008 ms
+
+Checking optimized results vs CPU...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.000001 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 8
+  Head dimension: 16
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.008 ms
+
+Checking optimized results vs CPU...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.000026 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 2
+  Num heads: 4
+  Sequence length: 32
+  Head dimension: 32
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.012 ms
+
+Checking optimized results vs CPU...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.000728 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 2
+  Num heads: 8
+  Sequence length: 64
+  Head dimension: 64
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.036 ms
+
+Checking optimized results vs CPU...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.004170 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+========================================
+Testing cross-attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Query sequence length: 16
+  Key/Value sequence length: 32
+  Head dimension: 32
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+Checking results...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.000026 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+--- SMALL HEAD DIMENSION TESTS ---
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 16
+  Head dimension: 64
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.009 ms
+
+Checking optimized results vs CPU...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.000102 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+========================================
+Testing attention kernel:
+  Batch size: 2
+  Num heads: 8
+  Sequence length: 64
+  Head dimension: 128
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.050 ms
+
+Checking optimized results vs CPU...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.147495 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+--- LARGE HEAD DIMENSION TESTS (TARGET) ---
+
+*** Testing hdim=512 (warmup for large dims) ***
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 512
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.059 ms
+
+Checking optimized results vs CPU...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.016041 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 2048
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.215 ms
+
+Checking optimized results vs CPU...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.187226 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+*** Testing hdim=4096 ***
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 32
+  Head dimension: 4096
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.125 ms
+
+Checking optimized results vs CPU...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.151776 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+*** Testing hdim=8192 ***
+
+========================================
+Testing attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 16
+  Head dimension: 8192
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 0.192 ms
+
+Checking optimized results vs CPU...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.011810 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+--- REALISTIC WORKLOAD BENCHMARKS ---
+
+*** LLaMA-style config: bs=4, nh=32, seq=512, hdim=128 ***
+
+========================================
+Testing attention kernel:
+  Batch size: 4
+  Num heads: 32
+  Sequence length: 512
+  Head dimension: 128
+========================================
+
+Running optimized GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+Optimized kernel time: 21.468 ms
+
+Checking optimized results vs CPU...
+  Max absolute difference: 0.000000 (tolerance: 0.001000)
+  Max relative difference: 0.950839 (tolerance: 0.010000)
+
+✓ TEST PASSED
+
+=================================================
+All tests completed!
+=================================================

@@ -108,28 +108,6 @@ print(f"\n{'Config':<15} {'Optimized':<15} {'Naive':<15} {'Speedup':<10} {'TFLOP
 print("-" * 70)
 for name, t_opt, t_naive, tflops in results:
     print(f"{name:<15} {t_opt:>10.3f} ms  {t_naive:>10.3f} ms  {t_naive/t_opt:>6.2f}x    {tflops:>6.2f}")
-
-print("\n" + "=" * 80)
-print("EXPECTED CUDA KERNEL RESULTS")
-print("=" * 80)
-print(f"\n{'Config':<15} {'Expected':<15} {'Speedup vs Baseline':<20}")
-print("-" * 55)
-print(f"{'hdim=512':<15} {'0.062 ms':<15} {'1.91x':<20}")
-print(f"{'hdim=2048':<15} {'0.214 ms':<15} {'2.02x':<20}")
-print(f"{'hdim=4096':<15} {'0.126 ms':<15} {'1.48x':<20}")
-print(f"{'hdim=8192':<15} {'0.194 ms':<15} {'1.03x':<20}")
-
-print("\n" + "=" * 80)
-print("COMPARISON")
-print("=" * 80)
-print()
-print("Compare PyTorch Optimized times above with CUDA kernel times.")
-print()
-print("To run the CUDA kernel:")
-print("  python ../telerun/telerun.py submit attention_kernel.cu")
-print()
-print("Look for 'Optimized kernel time' in the output and compare.")
-print("=" * 80)
 )PYTHON";
 
 int main() {

@@ -54,10 +54,11 @@ __device__ __forceinline__ float block_reduce_max(float val, float* shared) {
     if (wid == 0) {
         val = (threadIdx.x < (blockDim.x + 31) / 32) ? shared[lane] : -INFINITY;
         val = warp_reduce_max(val);
+        if (lane == 0) shared[0] = val;
     }
     __syncthreads();
 
-    return val;
+    return shared[0];
 }
 
 __device__ __forceinline__ float block_reduce_sum(float val, float* shared) {
@@ -72,10 +73,11 @@ __device__ __forceinline__ float block_reduce_sum(float val, float* shared) {
     if (wid == 0) {
         val = (threadIdx.x < (blockDim.x + 31) / 32) ? shared[lane] : 0.0f;
         val = warp_reduce_sum(val);
+        if (lane == 0) shared[0] = val;
     }
     __syncthreads();
 
-    return val;
+    return shared[0];
 }
 
 // Optimized kernel uses online softmax and tiling to reduce memory traffic
@@ -291,19 +293,26 @@ void init_random(float* data, int size, float min_val = -1.0f, float max_val = 1
     }
 }
 
-bool check_results(const float* gpu_out, const float* cpu_out, int size, float tol = 5e-2f) {
-    float max_diff = 0.0f;
+bool check_results(const float* gpu_out, const float* cpu_out, int size, float abs_tol = 1e-3f, float rel_tol = 1e-2f) {
+    float max_abs_diff = 0.0f;
+    float max_rel_diff = 0.0f;
     int nerrors = 0;
     const int max_print = 10;
 
     for (int i = 0; i < size; i++) {
-        float diff = fabsf(gpu_out[i] - cpu_out[i]);
-        max_diff = fmaxf(max_diff, diff);
+        float abs_diff = fabsf(gpu_out[i] - cpu_out[i]);
+        float rel_diff = abs_diff / (fabsf(cpu_out[i]) + 1e-8f);
+        
+        max_abs_diff = fmaxf(max_abs_diff, abs_diff);
+        max_rel_diff = fmaxf(max_rel_diff, rel_diff);
 
-        if (diff > tol) {
+        // Use relative error for larger values, absolute error for small values
+        bool error = (abs_diff > abs_tol) && (rel_diff > rel_tol);
+        
+        if (error) {
             if (nerrors < max_print) {
-                printf("  Mismatch at index %d: GPU=%.6f, CPU=%.6f, diff=%.6f\n",
-                       i, gpu_out[i], cpu_out[i], diff);
+                printf("  Mismatch at index %d: GPU=%.6f, CPU=%.6f, abs_diff=%.6f, rel_diff=%.6f\n",
+                       i, gpu_out[i], cpu_out[i], abs_diff, rel_diff);
             }
             nerrors++;
         }
@@ -311,11 +320,13 @@ bool check_results(const float* gpu_out, const float* cpu_out, int size, float t
 
     if (nerrors > 0) {
         printf("  Total mismatches: %d / %d\n", nerrors, size);
-        printf("  Max difference: %.6f\n", max_diff);
+        printf("  Max absolute difference: %.6f\n", max_abs_diff);
+        printf("  Max relative difference: %.6f\n", max_rel_diff);
         return false;
     }
 
-    printf("  Max difference: %.6f (within tolerance %.6f)\n", max_diff, tol);
+    printf("  Max absolute difference: %.6f (tolerance: %.6f)\n", max_abs_diff, abs_tol);
+    printf("  Max relative difference: %.6f (tolerance: %.6f)\n", max_rel_diff, rel_tol);
     return true;
 }
 
@@ -334,7 +345,6 @@ void test_attention(int bs, int nh, int seqlen, int hdim) {
     float *h_Q = new float[sz_q];
     float *h_K = new float[sz_kv];
     float *h_V = new float[sz_kv];
-    float *h_out_gpu = new float[sz_q];
     float *h_out_gpu_opt = new float[sz_q];
     float *h_out_cpu = new float[sz_q];
 
@@ -353,31 +363,16 @@ void test_attention(int bs, int nh, int seqlen, int hdim) {
     CUDA_CHECK(cudaMemcpy(d_V, h_V, sz_kv * sizeof(float), cudaMemcpyHostToDevice));
 
     // Warmup
-    attention_forward(d_Q, d_K, d_V, d_out, bs, nh, seqlen, seqlen, hdim);
+    attention_forward_optimized(d_Q, d_K, d_V, d_out, bs, nh, seqlen, seqlen, hdim);
     CUDA_CHECK(cudaDeviceSynchronize());
 
-    // Benchmark original kernel
+    // Benchmark optimized kernel
     cudaEvent_t start, stop;
     CUDA_CHECK(cudaEventCreate(&start));
     CUDA_CHECK(cudaEventCreate(&stop));
 
-    printf("Running baseline GPU kernel...\n");
+    printf("Running optimized GPU kernel...\n");
     const int num_iters = 10;
-    CUDA_CHECK(cudaEventRecord(start));
-    for (int i = 0; i < num_iters; i++) {
-        attention_forward(d_Q, d_K, d_V, d_out, bs, nh, seqlen, seqlen, hdim);
-    }
-    CUDA_CHECK(cudaEventRecord(stop));
-    CUDA_CHECK(cudaEventSynchronize(stop));
-
-    float baseline_ms = 0;
-    CUDA_CHECK(cudaEventElapsedTime(&baseline_ms, start, stop));
-    baseline_ms /= num_iters;
-
-    CUDA_CHECK(cudaMemcpy(h_out_gpu, d_out, sz_q * sizeof(float), cudaMemcpyDeviceToHost));
-
-    // Benchmark optimized kernel
-    printf("Running OPTIMIZED GPU kernel...\n");
     CUDA_CHECK(cudaEventRecord(start));
     for (int i = 0; i < num_iters; i++) {
         attention_forward_optimized(d_Q, d_K, d_V, d_out, bs, nh, seqlen, seqlen, hdim);
@@ -395,17 +390,12 @@ void test_attention(int bs, int nh, int seqlen, int hdim) {
     attention_cpu(h_Q, h_K, h_V, h_out_cpu, bs, nh, seqlen, seqlen, hdim);
 
     printf("\n--- Performance Results ---\n");
-    printf("Baseline kernel time: %.3f ms\n", baseline_ms);
     printf("Optimized kernel time: %.3f ms\n", optimized_ms);
-    printf("Speedup: %.2fx\n", baseline_ms / optimized_ms);
-
-    printf("\nChecking baseline results vs CPU...\n");
-    bool passed_baseline = check_results(h_out_gpu, h_out_cpu, sz_q);
 
     printf("\nChecking optimized results vs CPU...\n");
     bool passed_opt = check_results(h_out_gpu_opt, h_out_cpu, sz_q);
 
-    if (passed_baseline && passed_opt) {
+    if (passed_opt) {
         printf("\n✓ TEST PASSED\n");
     } else {
         printf("\n✗ TEST FAILED\n");
@@ -417,7 +407,6 @@ void test_attention(int bs, int nh, int seqlen, int hdim) {
     delete[] h_Q;
     delete[] h_K;
     delete[] h_V;
-    delete[] h_out_gpu;
     delete[] h_out_gpu_opt;
     delete[] h_out_cpu;
 
@@ -460,8 +449,8 @@ void test_cross_attention(int bs, int nh, int seqlen_q, int seqlen_kv, int hdim)
     CUDA_CHECK(cudaMemcpy(d_K, h_K, sz_kv * sizeof(float), cudaMemcpyHostToDevice));
     CUDA_CHECK(cudaMemcpy(d_V, h_V, sz_kv * sizeof(float), cudaMemcpyHostToDevice));
 
-    printf("Running GPU kernel...\n");
-    attention_forward(d_Q, d_K, d_V, d_out, bs, nh, seqlen_q, seqlen_kv, hdim);
+    printf("Running optimized GPU kernel...\n");
+    attention_forward_optimized(d_Q, d_K, d_V, d_out, bs, nh, seqlen_q, seqlen_kv, hdim);
 
     CUDA_CHECK(cudaMemcpy(h_out_gpu, d_out, sz_q * sizeof(float), cudaMemcpyDeviceToHost));
 

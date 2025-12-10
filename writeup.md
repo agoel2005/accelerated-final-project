@@ -6,18 +6,22 @@ Advay Goel and Dylan Yu
 
 For memory-bound GPU operations, we commonly use a technique called *kernel fusion* to eliminate redundant memory traffic. When you launch separate kernels, intermediate results must be written to global memory and read back microseconds later. FlashAttention demonstrated this for attention mechanisms: by fusing the QK^T matmul, softmax, and score-value matmul into a single kernel with online computation, it achieved speedups over naive implementations.
 
-We started this project with a simple hypothesis: if fusing attention's internal operations works so well, what about with positional embeddings? Transformers first started with sinusoidal embeddings, and modern transformers have adopted rotational positional embeddings (RoPE). In nearly every modern implementation, these run as separate preprocessing kernels before the attention computation. That's two extra kernel launches and two full passes over the Q and K matrices. So we thought: maybe we could do better?
+We started this project with a simple hypothesis: if fusing attention's internal operations works so well, what about with positional embeddings? Transformers first started with sinusoidal embeddings, and modern transformers have adopted rotational positional embeddings (RoPE). In nearly every modern implementation, these run as separate preprocessing kernels before the attention computation. This requires two extra kernel launches and two full passes over the Q and K matrices. We thought that by fusing these into a singular kernel, we could maybe do better. 
 
-As it turns out, people are smart and if something as simple as "let's add RoPE!" worked, we would have seen it already. But interestingly, fusion with sinusoidal embeddings did work, which begets two questions:
+This writeup covers our optimization of fused PE-attention kernels for large hidden dimensions (512-8192), showing what worked, what failed, and why.
 
-1. Why did sinusoidal embeddings work and RoPE not?
-2. Is there a way that we could get RoPE to fuse, even if not fully?
+## Related Work
 
-This writeup covers our optimization of fused PE-attention kernels for large hidden dimensions (512-16384), showing what worked, what failed, and why.
+There are several attention optimization attempts due to attention's important role in Transformers. Attention optimization is mainly dominated by the FlashAttention family but there are several other algorithms as well. 
 
-## Understanding the Baseline
+Despite this, positional embeddings remain largely unfused in existing systems. All major frameworks, including PyTorch, TensorFlow, and JAX, implement positional embeddings as separate preprocessing kernels that run before attention. To our knowledge, no existing publicly-available implementation fuses sinusoidal positional embeddings into attention kernels, despite the potential for eliminating redundant memory traffic. However, for RoPE, there are a few existing optimizations. 
 
-We first analyzed attention's arithmetic intensity (the ratio of FLOPs to bytes transferred) to determine whether the operation is memory-bound or compute-bound.
+Most recent work explore optimizing RoPe by combining the rotation operation with the QK matmul, rather than the full attention pipeline. For example, vLLM and TensorRT-LLM kernels apply RoPE inline during matrix multiplication, but still treat Q and K rotation as separate from attention itself. Moreover, the FlashInfer library seems to provide a fused kernel for RoPE and attention, though it does not appear to be documented well and is difficult to benchmark against.
+
+
+## Baseline Attention Kernel
+
+We first analyzed attention's arithmetic intensity to determine whether the operation is memory-bound or compute-bound.
 
 For a single query with hidden dimension 8192 and sequence length 16:
 
@@ -33,18 +37,27 @@ softmax@V phase:
 - Arithmetic Intensity: 0.50 FLOPs/byte
 ```
 
-On the RTX 4000 Ada (our target GPU with 26.7 TFLOPS FP32 and 360 GB/s memory bandwidth), you need at least 74 FLOPs/byte to be compute-bound. At 0.5 FLOPs/byte, we're **severely memory-bound** -- about 150x below the threshold. This means tensor cores, fancy math tricks, and compute optimizations won't help -- we need to reduce memory traffic.
+On the RTX 4000 Ada, you need at least 74 FLOPs/byte to be compute-bound. At 0.5 FLOPs/byte, we're severely memory-bound. This means we need to reduce memory traffic.
 
-Our baseline FP32 implementation already included online softmax with K/V tiling (processing keys and values in blocks of 64), which we inherited from the FlashAttention approach. This achieved respectable performance:
+To start, we wrote an optimized attention kernel with similar optimizations to FlashAttention in order to create baselines and build on top of. We included online softmax with K/V tiling and float4 vectorization. One important choice of note was we decided to keep the data type as FP32. Some (failed) implementations using Tensor Cores used BF16. However, we were unable to get tensor core performance to match our FP32 optimized attention (likely due to the memory-bound nature of the problem). While FP16 also seemed desirable, it turned out to be slower due to all of the conversions back to FP32 in order to compute functions like exp() for softmax. Ultimately, we achieved the following performance:
 
 | Hidden Dim | Time | TFLOPS | Status |
 |-----------|------|--------|--------|
-| 512 | 0.062 ms | 2.16 | Good |
-| 2048 | 0.214 ms | 2.51 | Good |
+| 512 | 0.042 ms | 2.16 | Good |
+| 2048 | 0.184 ms | 2.51 | Good |
 | 4096 | 0.126 ms | 4.26 | Best |
 | 8192 | 0.194 ms | 0.69 | Struggling |
 
-The performance cliff at hdim=8192 was our first clue. At this scale, the working set (1 MB for K + V) exceeds the L2 cache, causing constant DRAM traffic. We were achieving only 87 GB/s out of the RTX 4000 Ada's 360 GB/s peak bandwidth -- just 24% utilization.
+We also wrote a script to compare this performance to PyTorch's implementations of attention. PyTorch required time was as follows:
+
+| Hidden Dim | Optmized Attention | Naive Attention |
+|-----------|------|--------|--------|
+| 512 | 0.032 ms | 0.077 ms | 
+| 2048 | 0.114 ms | 0.219 ms |
+| 4096 | 0.190 ms | 0.412 ms | 
+| 8192 | 0.362 ms | 0.081 ms |
+
+We aren't as fast as Pytorch's implementation, but our attention kernel performs reasonably well to the point where results with fused attention become more meaningful. From the data, we ultimately realized the TFLOPS performance cliff at hdim=8192. At this scale, the working set (1 MB for K + V) exceeds the L2 cache, causing constant DRAM traffic. We were achieving only 87 GB/s out of the RTX 4000 Ada's 360 GB/s peak bandwidth, just 24% utilization.
 
 ## Sinusoidal Embeddings
 
@@ -79,7 +92,7 @@ k_val += (d % 2 == 0) ? sin_val : cos_val;
 score += q_val * k_val;
 ```
 
-**Results:** Way too slow.
+**Results:** 
 
 | hdim | Fused (V1) | Speedup |
 |------|-----------|---------|
@@ -87,11 +100,11 @@ score += q_val * k_val;
 | 2048 | 0.950 ms | **0.43x** |
 | 4096 | 0.378 ms | **0.58x** |
 
-The problem was obvious once we profiled it: we were loading sin/cos values from global memory for every single Q-K pair. For a 64x64 attention matrix with hdim=2048, that's 64 x 64 x 2048 = 8.4 million loads from global memory, all for values we could compute on the fly.
+This was obviously slow since we were loading sin/cos values from global memory for every single Q-K pair. For a 64x64 attention matrix with hdim=2048, that's 64 x 64 x 2048 = 8.4 million loads from global memory.
 
-### V2-V3: Trading Memory for Compute
+### V2-V3: On The Fly Computation
 
-Let's replace table lookups with on-the-fly computation:
+To fix this, we considered calculating the sine/cosine values on the fly:
 
 ```cuda
 float freq = 1.0f / powf(10000.0f, (2.0f * (d/2)) / hdim);
@@ -106,7 +119,7 @@ float cos_val = cosf(angle);
 | 2048 | 0.950 ms | **0.407 ms** | **2.33x faster** |
 | 4096 | 0.378 ms | **0.219 ms** | **1.72x faster** |
 
-Sweet! By trading expensive memory loads for cheap SFU operations, we beat even the baseline separate kernel approach.
+This led to us beating the table approach.
 
 ### V4-V5: Cached Frequencies + Vectorization
 
@@ -136,7 +149,7 @@ This achieved a 1.4-2.0x speedup over the separate kernel baseline.
 
 ## RoPE
 
-RoPE looked similar enough to sinusoidal embeddings that we expected similar results. The embedding formula rotates pairs of dimensions:
+RoPE looked similar to sinusoidal embeddings so we expected similar results. The embedding formula rotates pairs of dimensions:
 
 ```
 for each pair (x, y) at dimension d:
@@ -148,7 +161,7 @@ for each pair (x, y) at dimension d:
 
 Like sinusoidal embeddings, the standard implementation uses separate kernels for Q and K, then runs attention. We tried applying the same optimizations: on-the-fly computation with cached frequencies, float4 vectorization, and __sincosf.
 
-### V1-V2: Full Fusion?
+### V1-V2: Full Fusion
 
 Besides the optimizations above, we cached the rotated Q in shared memory but recomputed K's rotation for each Q-K pair:
 
@@ -170,7 +183,7 @@ for (int k_idx = 0; k_idx < seq_k; k_idx++) {
 }
 ```
 
-**Results:** Not good.
+**Results:** 
 
 | hdim | Fused | Separate | Performance |
 |------|-------|----------|------------|
@@ -185,10 +198,10 @@ The problem was algorithmic. In the separate kernel approach:
 
 In the fused approach:
 - Apply RoPE to Q: 64 vectors x 1 time = 64 operations
-- Apply RoPE to K: 64 vectors x 64 queries = **4,096 operations**
+- Apply RoPE to K: 64 vectors x 64 queries = 4,096 operations
 - Total: **4,160 RoPE operations**
 
-We were doing **32x more work** to save a single kernel launch and intermediate buffer. Even though both approaches are memory-bound, adding 30x more computation *and* memory traffic doesn't help.
+We were doing **32x more work** to save a single kernel launch and intermediate buffer. Even though both approaches are memory-bound, this made the process significantly slower.
 
 ### V3-V6: More Optimizations
 
@@ -208,9 +221,9 @@ The problem turned out to be shared memory limits. With only 48 KB available and
 
 **V6 (Dimension tiling):** Tile both the sequence dimension *and* hdim dimension. Better than V5 (3.3x faster), but still 2.5x slower than separate kernels.
 
-### V7: Partial Fusion?
+### V7: Partial Fusion
 
-The winning strategy: fuse only Q rotation, keep K rotation separate.
+Our final idea was to fuse only the Q rotation but keep K rotation separate. 
 
 ```
 1. Pre-rotate K using separate kernel: O(seq_k) operations
@@ -218,7 +231,7 @@ The winning strategy: fuse only Q rotation, keep K rotation separate.
 3. Total: O(seq_q + seq_k) operations (same as fully separate!)
 ```
 
-This "hybrid" approach eliminates the redundant K computation while keeping Q fusion benefits:
+The reason why this approach works so well is because it eliminates redoing the computations on K while maintaining the benefits of fusing Q's PE. The results were positive, matching our hypothesis:
 
 | hdim | Hybrid (V7) | Fully Separate | Speedup |
 |------|------------|----------------|---------|
@@ -230,17 +243,17 @@ This "hybrid" approach eliminates the redundant K computation while keeping Q fu
 
 Q rotation can be fused because each query is processed independently -- we rotate Q once when loading it, then use it for all K comparisons. This is O(seq_q) work.
 
-K rotation cannot be fused because each K vector needs to be compared against all queries. Fusing means rotating K once per query (O(seq_q x seq_k) work), which is 64x more expensive than rotating it once in a separate kernel (O(seq_k) work).
+K rotation cannot be fused because each K vector needs to be compared against all queries. Fusing means rotating K once per query (O(seq_q x seq_k) work), which is seq_q times more expensive than rotating it once in a separate kernel (O(seq_k) work).
 
 By fusing only Q's rotation, we:
 - Save one kernel launch (no separate Q RoPE kernel)
 - Eliminate one global memory buffer (Q_rope)
 - Improve cache locality (Q loaded once, rotated inline)
-- Avoid O(seq^2) redundant computation
+- Avoid redundant computation
 
-## So Why Did Sinusoidal Work?
+## Why Did Sinusoidal Work?
 
-The answer lies in how the operations interact with the data.
+We thought that since RoPE required partial fusion, why didn't sinusoidal: 
 
 Sinusoidal embeddings add to each element independently:
 
@@ -257,38 +270,66 @@ Q'[i+1] = Q[i] * sin(...) + Q[i+1] * cos(...)
 
 This coupling means:
 1. **Can't vectorize RoPE as easily:** float4 loads don't align with rotation pairs
-2. **Can't cache partial results:** The rotation is all-or-nothing
+2. **Can't cache partial results** 
 3. **More total arithmetic:** 4 multiplies + 2 adds per pair vs 1 add per element
 4. **SFU less effective:** Need both sin and cos applied to both elements
 
-For sinusoidal embeddings:
-- Computing on-the-fly: ~4 FLOPs per element (1 add + SFU)
-- Loading from table: 2 memory transactions
+We also tried using partial-fusion for sinusoidal but the results were actually slower, leading us to stick with the full fusion approach mentioned earlier.
 
-For RoPE:
-- Computing on-the-fly: ~6 FLOPs per element (4 muls + 2 adds + SFU)
-- Loading rotated values: Can't cache them without O(seq^2) redundancy
+## Discussion and Limitations
 
-The crucial insight: **fusion only helps when you can compute values on-demand without redundancy**. Sinusoidal embeddings depend only on position and dimension index. RoPE depends on the *values* being rotated, so recomputing it means recalculating for every Q-K pair.
+### Performance Results Summary
 
-For RoPE, the hybrid approach works because Q appears in the outer loop (one rotation per query) while K appears in the inner loop (would require seq_q rotations). Fusing the outer loop variable succeeds; fusing the inner loop variable fails.
+Our experiments demonstrated that kernel fusion for positional embeddings is highly dependent on the embedding type and computational structure:
 
-## Conclusion
+**Sinusoidal Embeddings:**
 
-We set out to fuse positional embeddings into attention kernels and achieved 1.4-2.0x speedups for sinusoidal embeddings and 1.4-1.6x for RoPE (via partial fusion).
+We achieved 1.4-2.0x speedup over separate kernels by elimianting ~1MB of redundant memory traffic. We accomplished it via a full fusion.
 
-For sinusoidal embeddings, full fusion succeeded because sin/cos values depend only on position and dimension index -- computing them on-the-fly during the QK dot product costs about the same as loading from memory, and eliminates intermediate buffers.
 
-For RoPE, full fusion failed because it introduced O(seq_q x seq_k) redundant computation -- rotating K once per query instead of once total. The hybrid solution (fuse Q rotation, separate K rotation) achieved speedups by fusing the outer loop variable while keeping the inner loop variable separate.
+**RoPE Embeddings:**
 
-The broader lesson: **you should only fuse embeddings that don't depend on the input values**. Sinusoidal embeddings are pure functions of position and dimension, but RoPE rotates the actual Q/K values, so fusing it into the attention loop means recomputing rotations for every Q-K pair instead of once per token.
+We achieved a 1.4-1.6x speedup over separate kernels via a partial fusion where we only fused the Q matrix's positional encoding. For attempts with full fusion, the runtime increased drastically, with results being 2.6-8.5x slower.
 
-This explains why production frameworks keep positional embeddings as separate preprocessing: for prefill workloads where seq_q and seq_k are approximately equal, any value-dependent embedding like RoPE would introduce O(N^2) redundant rotations. Even sinusoidal embeddings might not be worth fusing if the framework already has optimized separate kernels. Our results suggest sinusoidal fusion could be worthwhile (1.4-2.0x speedup), while RoPE needs the hybrid approach to avoid catastrophic slowdowns.
 
-Future work could explore:
-1. **FP8/INT8 embeddings**: Lower precision positional encodings could reduce memory traffic further on newer GPUs
-2. **Learned positional embeddings**: ALiBi and other learned schemes might have different fusion characteristics
-3. **Decode workloads**: Hybrid RoPE fusion should work better during inference (seq_q=1-4, seq_k=1000s) since Q rotation redundancy is minimal
+### Limitations
+
+**1. Hardware Constraints**
+
+Our kernels were optimized for and tested exclusively on the NVIDIA RTX 4000 Ada Generation GPU. RTX 4000 Ada is no longer a SOTA GPU, so our performance characteristics would differ if we ran it on newer GPUs like H100s. It would also allow us to use much larger hdim sizes and be even quicker than we currently are. 
+
+**2. Workload Assumptions**
+
+Our benchmarks focused on workloads where seq_q ≈ seq_k, batch sizes were 1-4, sequence lengths were 16-64, and hdim size was 512-8192. 
+
+In the real world, decoders are often autoregressive, where seq_k >> seq_q. Additionally, the batch size and sequence length would be a lot larger, and different precision types are used other than just FP32. 
+
+**3. Attention Limitations**
+
+Our base attention kernel was a little slower than PyTorch's built-in optimized Attention function, which is likely built upon FlashAttention 2. If we used this more optimized kernel, it is possible that results could also be different. 
+
+**4. Positional Embedding Coverage**
+
+We only tested two embedding types, sinusoidal and RopE. Two big classes of embeddings that we didn't test were learned embeddings (which seem quite difficult to build out-of-the-box fusions for) and hierarchical embeddings. 
+
+
+### Directions for Future Work
+
+
+**1.Tensor Core and Mixed Precision**
+
+We were unable to optimize our attention kernels via tensor cores. If properly used, they would likely speed up our kernel significantly and bring it closer to SOTA on PyTorch. Doing so might elicit new behavior in the fused kernel as well as providing new opportunities to add fusions/optimizations. 
+
+In doing so, we would also shift to BF16, which enables lower precision. However, a potential challenge would be functions like exponentiation, sine, and cosine all require FP32, so there would be a lot of conversions. 
+
+**2. Fusing More Positional Embeddings**
+
+As mentioned above, two classes of PEs that we didn't fuse were learned embeddings and hierarchical. Creating a system for fusing hierarchical embeddings seems like an interesting next step. 
+
+**3. Further Thought into Algorithms**
+
+These were our best attempts at fusing sinusoidal and RoPE embeddings. It is likely that better algorithms exist for fusion that we did not yet think of. These might yield even better performance than what we achieved.
+
 
 ---
 
@@ -328,3 +369,7 @@ bool passed = (max_diff < 5e-5);  // Tolerance for FP32
 We used **telerun** to execute tests on remote GPU servers with NVIDIA RTX 4000 Ada Generation GPUs (6144 CUDA cores, 26.7 TFLOPS FP32, 360 GB/s bandwidth). All benchmarks reported in this writeup were run on this hardware.
 
 **Correctness Results:** All implementations passing with max error < 5e-5 for FP32.
+
+---
+
+

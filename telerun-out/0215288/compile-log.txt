@@ -1,0 +1,37 @@
+/tmp/tmphh9n3y0s/source.cu(357): error: identifier "start" is undefined
+      do { cudaError_t err = (cudaEventRecord(start)); if (err != cudaSuccess) { std::cerr << "CUDA error " << static_cast<int>(err) << " (" << cudaGetErrorString(err) << ") at " << "/tmp/tmphh9n3y0s/source.cu" << ":" << 357 << std::endl; std::exit(
+                                              ^
+
+/tmp/tmphh9n3y0s/source.cu(358): error: identifier "num_iters" is undefined
+      for (int i = 0; i < num_iters; i++) {
+                          ^
+
+/tmp/tmphh9n3y0s/source.cu(361): error: identifier "stop" is undefined
+      do { cudaError_t err = (cudaEventRecord(stop)); if (err != cudaSuccess) { std::cerr << "CUDA error " << static_cast<int>(err) << " (" << cudaGetErrorString(err) << ") at " << "/tmp/tmphh9n3y0s/source.cu" << ":" << 361 << std::endl; std::exit(
+                                              ^
+
+/tmp/tmphh9n3y0s/source.cu(362): error: identifier "stop" is undefined
+      do { cudaError_t err = (cudaEventSynchronize(stop)); if (err != cudaSuccess) { std::cerr << "CUDA error " << static_cast<int>(err) << " (" << cudaGetErrorString(err) << ") at " << "/tmp/tmphh9n3y0s/source.cu" << ":" << 362 << std::endl; std::exit(
+                                                   ^
+
+/tmp/tmphh9n3y0s/source.cu(365): error: identifier "start" is undefined
+      do { cudaError_t err = (cudaEventElapsedTime(&optimized_ms, start, stop)); if (err != cudaSuccess) { std::cerr << "CUDA error " << static_cast<int>(err) << " (" << cudaGetErrorString(err) << ") at " << "/tmp/tmphh9n3y0s/source.cu" << ":" << 365 << std::endl; std::exit(
+                                                                  ^
+
+/tmp/tmphh9n3y0s/source.cu(365): error: identifier "stop" is undefined
+      do { cudaError_t err = (cudaEventElapsedTime(&optimized_ms, start, stop)); if (err != cudaSuccess) { std::cerr << "CUDA error " << static_cast<int>(err) << " (" << cudaGetErrorString(err) << ") at " << "/tmp/tmphh9n3y0s/source.cu" << ":" << 365 << std::endl; std::exit(
+                                                                         ^
+
+/tmp/tmphh9n3y0s/source.cu(366): error: identifier "num_iters" is undefined
+      optimized_ms /= num_iters;
+                      ^
+
+/tmp/tmphh9n3y0s/source.cu(388): error: identifier "start" is undefined
+      do { cudaError_t err = (cudaEventDestroy(start)); if (err != cudaSuccess) { std::cerr << "CUDA error " << static_cast<int>(err) << " (" << cudaGetErrorString(err) << ") at " << "/tmp/tmphh9n3y0s/source.cu" << ":" << 388 << std::endl; std::exit(
+                                               ^
+
+/tmp/tmphh9n3y0s/source.cu(389): error: identifier "stop" is undefined
+      do { cudaError_t err = (cudaEventDestroy(stop)); if (err != cudaSuccess) { std::cerr << "CUDA error " << static_cast<int>(err) << " (" << cudaGetErrorString(err) << ") at " << "/tmp/tmphh9n3y0s/source.cu" << ":" << 389 << std::endl; std::exit(
+                                               ^
+
+9 errors detected in the compilation of "/tmp/tmphh9n3y0s/source.cu".
