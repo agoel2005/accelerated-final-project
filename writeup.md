@@ -68,16 +68,16 @@ PE(pos, 2i)   = sin(pos / 10000^(2i/hdim))
 PE(pos, 2i+1) = cos(pos / 10000^(2i/hdim))
 ```
 
-You compute these values and add them to Q and K before attention. The standard approach uses three kernels:
+The computed PE values are added to Q and K before attention. The standard approach uses three kernels:
 1. Apply embeddings to Q to get Q'
 2. Apply embeddings to K to get K'
 3. Run attention on Q', K'
 
-This means writing Q_embedded and K_embedded to global memory, then reading them back. For hdim=2048 and seq=64, that's 1 MB of redundant traffic.
+In doing so, we need to write Q_embedded and K_embedded to global memory, then read them back. For hdim=2048 and seq=64, that causes 1 MB of traffic.
 
 ### V1: Naive Fusion
 
-Our first attempt seemed obvious -- precompute sin/cos lookup tables and fuse the embedding application into the attention kernel:
+For our first attempt, we precompute sin/cos lookup tables and fuse the embedding application into the attention kernel. This allows us to avoid saving Q and K in memory.
 
 ```cuda
 // For each Q-K pair in attention:
@@ -191,15 +191,11 @@ for (int k_idx = 0; k_idx < seq_k; k_idx++) {
 | 512 | 0.183 ms | 0.069 ms | **2.65x slower** |
 | 2048 | 0.753 ms | 0.230 ms | **3.27x slower** |
 
-The problem was algorithmic. In the separate kernel approach:
-- Apply RoPE to all Q vectors: 64 vectors x 1 time = **64 RoPE operations**
-- Apply RoPE to all K vectors: 64 vectors x 1 time = **64 RoPE operations**
-- Total: **128 RoPE operations**
+The problem is due to the number of computations.
 
-In the fused approach:
-- Apply RoPE to Q: 64 vectors x 1 time = 64 operations
-- Apply RoPE to K: 64 vectors x 64 queries = 4,096 operations
-- Total: **4,160 RoPE operations**
+In the separate kernel approach, we apply RoPE to all Q vectors: 64 vectors x 1 time = 64 RoPE operations. Then, we apply RoPE to all K vectors: 64 vectors x 1 time = 64 RoPE operations, giving a total of **128 RoPE operations**.
+
+However, in the fused approach, we apply RoPE to Q: 64 vectors x 1 time = 64 operations. But for K, we do 64 vectors x 64 queries = 4,096 operations. This causes a total of **4,160 RoPE operations**
 
 We were doing **32x more work** to save a single kernel launch and intermediate buffer. Even though both approaches are memory-bound, this made the process significantly slower.
 
