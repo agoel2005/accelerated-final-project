@@ -1,0 +1,56 @@
+=================================================
+ULTRA LARGE Hidden Dimension Attention Tests
+Testing hdim = 16384 and 32768
+=================================================
+
+*** Testing hdim=16384 (seq=8) ***
+
+========================================
+Testing ULTRA LARGE attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 8
+  Head dimension: 16384
+========================================
+
+Running GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+GPU kernel time: 0.349 ms
+Performance: 0.01 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000001 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+*** Testing hdim=32768 (seq=4) ***
+
+========================================
+Testing ULTRA LARGE attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 4
+  Head dimension: 32768
+========================================
+
+Running GPU kernel...
+Running CPU reference...
+
+--- Performance Results ---
+GPU kernel time: 0.680 ms
+Performance: 0.00 TFLOPS
+
+Checking results vs CPU...
+  Max difference: 0.000001 (within tolerance 0.050000)
+
+✓ TEST PASSED
+
+=================================================
+ULTRA LARGE dimension tests completed!
+Compare with previous results:
+  - hdim=8192:  0.194 ms
+  - hdim=16384: ??? ms
+  - hdim=32768: ??? ms
+=================================================

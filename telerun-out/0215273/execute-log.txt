@@ -1,0 +1,154 @@
+=================================================
+Sinusoidal Attention Fusion Benchmark
+=================================================
+
+*** Testing hdim=512 ***
+
+========================================
+Testing Sinusoidal Attention:
+  Batch size: 1, Num heads: 4
+  Sequence length: 64, Hidden dim: 512
+========================================
+
+Testing FUSED V1 (table lookups)...
+Testing FUSED V2 (float4 vectorization)...
+Testing FUSED V3 (on-the-fly sin/cos)...
+Testing FUSED V4 (cached frequencies)...
+Testing FUSED V5 (float4 + __sincosf + cached freqs)...
+Testing SEPARATE kernel approach...
+Running CPU reference...
+
+========================================
+PERFORMANCE RESULTS
+========================================
+Fused V1 (table):      0.242 ms [baseline]
+Fused V2 (float4):     0.161 ms  (1.51x vs V1)
+Fused V3 (on-fly):     0.114 ms  (2.13x vs V1)
+Fused V4 (cached freq):0.114 ms  (2.12x vs V1)
+Fused V5 (v4+sincosf): 0.057 ms  (4.24x vs V1)
+Separate:              0.118 ms  (2.05x vs V1)
+========================================
+** BEST: V5 **
+========================================
+
+Checking fused V1 vs CPU...
+  Max difference: 0.000001 (within tolerance 0.050000)
+
+Checking fused V2 vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+Checking fused V3 vs CPU...
+  Max difference: 0.000002 (within tolerance 0.050000)
+
+Checking fused V4 vs CPU...
+  Max difference: 0.000002 (within tolerance 0.050000)
+
+Checking fused V5 vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000001 (within tolerance 0.050000)
+
+✓ ALL FUSED KERNELS PASSED
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing Sinusoidal Attention:
+  Batch size: 1, Num heads: 4
+  Sequence length: 64, Hidden dim: 2048
+========================================
+
+Testing FUSED V1 (table lookups)...
+Testing FUSED V2 (float4 vectorization)...
+Testing FUSED V3 (on-the-fly sin/cos)...
+Testing FUSED V4 (cached frequencies)...
+Testing FUSED V5 (float4 + __sincosf + cached freqs)...
+Testing SEPARATE kernel approach...
+Running CPU reference...
+
+========================================
+PERFORMANCE RESULTS
+========================================
+Fused V1 (table):      0.916 ms [baseline]
+Fused V2 (float4):     0.592 ms  (1.55x vs V1)
+Fused V3 (on-fly):     0.412 ms  (2.22x vs V1)
+Fused V4 (cached freq):0.416 ms  (2.20x vs V1)
+Fused V5 (v4+sincosf): 0.220 ms  (4.16x vs V1)
+Separate:              0.426 ms  (2.15x vs V1)
+========================================
+** BEST: V5 **
+========================================
+
+Checking fused V1 vs CPU...
+  Max difference: 0.000003 (within tolerance 0.050000)
+
+Checking fused V2 vs CPU...
+  Max difference: 0.000024 (within tolerance 0.050000)
+
+Checking fused V3 vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+Checking fused V4 vs CPU...
+  Max difference: 0.000005 (within tolerance 0.050000)
+
+Checking fused V5 vs CPU...
+  Max difference: 0.000024 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000003 (within tolerance 0.050000)
+
+✓ ALL FUSED KERNELS PASSED
+
+*** Testing hdim=4096 ***
+
+========================================
+Testing Sinusoidal Attention:
+  Batch size: 1, Num heads: 2
+  Sequence length: 32, Hidden dim: 4096
+========================================
+
+Testing FUSED V1 (table lookups)...
+Testing FUSED V2 (float4 vectorization)...
+Testing FUSED V3 (on-the-fly sin/cos)...
+Testing FUSED V4 (cached frequencies)...
+Testing FUSED V5 (float4 + __sincosf + cached freqs)...
+Testing SEPARATE kernel approach...
+Running CPU reference...
+
+========================================
+PERFORMANCE RESULTS
+========================================
+Fused V1 (table):      0.386 ms [baseline]
+Fused V2 (float4):     0.258 ms  (1.49x vs V1)
+Fused V3 (on-fly):     0.221 ms  (1.74x vs V1)
+Fused V4 (cached freq):0.234 ms  (1.65x vs V1)
+Fused V5 (v4+sincosf): 0.150 ms  (2.57x vs V1)
+Separate:              0.210 ms  (1.84x vs V1)
+========================================
+** BEST: V5 **
+========================================
+
+Checking fused V1 vs CPU...
+  Max difference: 0.000002 (within tolerance 0.050000)
+
+Checking fused V2 vs CPU...
+  Max difference: 0.000042 (within tolerance 0.050000)
+
+Checking fused V3 vs CPU...
+  Max difference: 0.000006 (within tolerance 0.050000)
+
+Checking fused V4 vs CPU...
+  Max difference: 0.000006 (within tolerance 0.050000)
+
+Checking fused V5 vs CPU...
+  Max difference: 0.000038 (within tolerance 0.050000)
+
+Checking separate vs CPU...
+  Max difference: 0.000002 (within tolerance 0.050000)
+
+✓ ALL FUSED KERNELS PASSED
+
+=================================================
+All tests completed!
+=================================================

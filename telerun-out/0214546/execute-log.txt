@@ -1,0 +1,186 @@
+=================================================
+OPTIMIZED FP16 Attention Kernel Test Suite
+With Online Softmax + K/V Tiling!
+=================================================
+
+--- BASIC CORRECTNESS TESTS ---
+
+========================================
+Testing OPTIMIZED FP16 attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 4
+  Head dimension: 8
+========================================
+
+Running OPTIMIZED FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+OPTIMIZED FP16 kernel time: 0.007 ms
+Performance: 0.00 TFLOPS
+
+Checking OPTIMIZED FP16 results vs CPU (FP32)...
+  Max difference: 0.000283 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+========================================
+Testing OPTIMIZED FP16 attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 8
+  Head dimension: 16
+========================================
+
+Running OPTIMIZED FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+OPTIMIZED FP16 kernel time: 0.007 ms
+Performance: 0.00 TFLOPS
+
+Checking OPTIMIZED FP16 results vs CPU (FP32)...
+  Max difference: 0.000258 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+========================================
+Testing OPTIMIZED FP16 attention kernel:
+  Batch size: 2
+  Num heads: 4
+  Sequence length: 32
+  Head dimension: 32
+========================================
+
+Running OPTIMIZED FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+OPTIMIZED FP16 kernel time: 0.009 ms
+Performance: 0.11 TFLOPS
+
+Checking OPTIMIZED FP16 results vs CPU (FP32)...
+  Max difference: 0.000247 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+--- LARGE HEAD DIMENSION TESTS ---
+
+*** Testing hdim=512 ***
+
+========================================
+Testing OPTIMIZED FP16 attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 512
+========================================
+
+Running OPTIMIZED FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+OPTIMIZED FP16 kernel time: 0.068 ms
+Performance: 0.49 TFLOPS
+
+Checking OPTIMIZED FP16 results vs CPU (FP32)...
+  Mismatch at index 37: GPU=0.260010, CPU=0.154479, diff=0.105531
+  Mismatch at index 43: GPU=-0.231323, CPU=-0.111618, diff=0.119705
+  Mismatch at index 298: GPU=-0.224243, CPU=-0.118925, diff=0.105319
+  Mismatch at index 300: GPU=0.228516, CPU=0.116846, diff=0.111669
+  Mismatch at index 301: GPU=-0.216797, CPU=-0.112835, diff=0.103962
+  Mismatch at index 303: GPU=-0.340088, CPU=-0.172858, diff=0.167230
+  Mismatch at index 549: GPU=0.268066, CPU=0.138782, diff=0.129285
+  Mismatch at index 553: GPU=-0.237183, CPU=-0.122812, diff=0.114371
+  Mismatch at index 560: GPU=0.275391, CPU=0.142580, diff=0.132810
+  Mismatch at index 566: GPU=0.222168, CPU=0.115047, diff=0.107121
+  Total mismatches: 2057 / 131072
+  Max difference: 0.310601
+
+✗ TEST FAILED (Note: FP16 has less precision than FP32)
+
+*** Testing hdim=2048 ***
+
+========================================
+Testing OPTIMIZED FP16 attention kernel:
+  Batch size: 1
+  Num heads: 4
+  Sequence length: 64
+  Head dimension: 2048
+========================================
+
+Running OPTIMIZED FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+OPTIMIZED FP16 kernel time: 0.247 ms
+Performance: 0.54 TFLOPS
+
+Checking OPTIMIZED FP16 results vs CPU (FP32)...
+  Mismatch at index 35: GPU=-0.265625, CPU=-0.129102, diff=0.136523
+  Mismatch at index 42: GPU=0.230469, CPU=0.111806, diff=0.118663
+  Mismatch at index 43: GPU=-0.493408, CPU=-0.241100, diff=0.252308
+  Mismatch at index 44: GPU=0.224365, CPU=0.109161, diff=0.115204
+  Mismatch at index 46: GPU=-0.213501, CPU=-0.103677, diff=0.109824
+  Mismatch at index 47: GPU=0.279297, CPU=0.135427, diff=0.143870
+  Mismatch at index 52: GPU=0.239502, CPU=0.116660, diff=0.122842
+  Mismatch at index 53: GPU=0.209961, CPU=0.102676, diff=0.107285
+  Mismatch at index 54: GPU=-0.200073, CPU=-0.096962, diff=0.103111
+  Mismatch at index 290: GPU=-0.214966, CPU=-0.104754, diff=0.110212
+  Total mismatches: 10116 / 524288
+  Max difference: 0.295250
+
+✗ TEST FAILED (Note: FP16 has less precision than FP32)
+
+*** Testing hdim=4096 ***
+
+========================================
+Testing OPTIMIZED FP16 attention kernel:
+  Batch size: 1
+  Num heads: 2
+  Sequence length: 32
+  Head dimension: 4096
+========================================
+
+Running OPTIMIZED FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+OPTIMIZED FP16 kernel time: 0.136 ms
+Performance: 0.25 TFLOPS
+
+Checking OPTIMIZED FP16 results vs CPU (FP32)...
+  Max difference: 0.000244 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+*** Testing hdim=8192 ***
+
+========================================
+Testing OPTIMIZED FP16 attention kernel:
+  Batch size: 1
+  Num heads: 1
+  Sequence length: 16
+  Head dimension: 8192
+========================================
+
+Running OPTIMIZED FP16 GPU kernel...
+Running CPU reference (FP32)...
+
+--- Performance Results ---
+OPTIMIZED FP16 kernel time: 0.183 ms
+Performance: 0.05 TFLOPS
+
+Checking OPTIMIZED FP16 results vs CPU (FP32)...
+  Max difference: 0.000421 (within tolerance 0.100000)
+
+✓ TEST PASSED
+
+=================================================
+All OPTIMIZED FP16 tests completed!
+Compare with previous results:
+  - FP32 optimized (hdim=2048): 0.214 ms, 2.51 TFLOPS
+  - FP16 naive (hdim=2048):     0.244 ms, 0.55 TFLOPS
+  - FP16 OPTIMIZED should beat both!
+=================================================
